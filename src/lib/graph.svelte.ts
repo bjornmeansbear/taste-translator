@@ -89,6 +89,10 @@ class Graph {
 	) {
 		const parent = this.nodes.find((n) => n.id === parentId);
 		if (!parent) return [];
+		// The model only sees the most recent titles on a big map, so drop
+		// anything it suggests that's already here rather than show it twice.
+		const onMap = new Set(this.nodes.map((n) => n.title.toLowerCase().trim()));
+		recs = recs.filter((r) => !onMap.has(r.title.toLowerCase().trim()));
 		const out: Node[] = [];
 		const count = recs.length;
 		const radius = 280 + Math.random() * 60;

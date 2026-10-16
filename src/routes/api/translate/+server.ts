@@ -1,4 +1,5 @@
 import { json, error } from '@sveltejs/kit';
+import Anthropic from '@anthropic-ai/sdk';
 import type { RequestHandler } from './$types';
 import { translateTaste, classifySeed } from '$lib/server/anthropic';
 import { fetchThumb, fetchThumbs } from '$lib/server/thumbnails';
@@ -12,8 +13,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		classify?: boolean;
 		loves?: string[];
 		dislikes?: string[];
-		avoidTitles?: string[];
-		existingItems?: string[];
+		/** Every title on the map except the seed (not repeated; bridge candidates). */
+		mapTitles?: string[];
 		findBridges?: boolean;
 		fetchSeedThumb?: boolean;
 	};
@@ -43,8 +44,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				seedDomain,
 				loves: body.loves ?? [],
 				dislikes: body.dislikes ?? [],
-				avoidTitles: body.avoidTitles ?? [],
-				existingItems: body.existingItems ?? [],
+				mapTitles: body.mapTitles ?? [],
 				findBridges: body.findBridges ?? false
 			}),
 			body.fetchSeedThumb
@@ -77,6 +77,12 @@ export const POST: RequestHandler = async ({ request }) => {
 		});
 	} catch (err) {
 		console.error('translate error', err);
+		// The SDK's message is "400 {json}"; pass on just the human sentence
+		// (e.g. "Your credit balance is too low…"). Upstream trouble is a 502.
+		if (err instanceof Anthropic.APIError) {
+			const body = err.error as { error?: { message?: string } } | undefined;
+			throw error(502, body?.error?.message ?? 'The translator is unavailable right now.');
+		}
 		const message = err instanceof Error ? err.message : 'translation failed';
 		throw error(500, message);
 	}

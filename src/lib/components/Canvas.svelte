@@ -370,6 +370,7 @@
 	   faintest edge, hard-edged (no soft falloff). */
 	.canvas-wrapper {
 		--dot: color-mix(in oklab, var(--color-text) 25%, transparent);
+		background-color: var(--color-canvas);
 		background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.5px);
 		position: fixed;
 		inset: 0;

@@ -248,8 +248,11 @@
 		color: var(--color-text);
 		border: 1px solid var(--color-border);
 	}
+	/* Active cards show the action buttons, which hang 14px below the card but
+	   are 28px tall: the padding clears the 14px inside the card plus a gap. */
 	.active .card-inner {
 		outline: 1px solid var(--color-border);
+		padding-bottom: 1.5rem;
 	}
 	/* Selected: the rule doubles, like a held-down card. */
 	.selected .card-inner {

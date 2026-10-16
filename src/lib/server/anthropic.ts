@@ -11,7 +11,16 @@ function getClient() {
 	return new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 3 });
 }
 
-const MODEL = 'claude-opus-4-7';
+// Sonnet for the translation itself: it carries the taste, where Opus cost far
+// more per click for little visible gain. Haiku for the one-line lookup.
+const TRANSLATE_MODEL = 'claude-sonnet-5-5';
+const CLASSIFY_MODEL = 'claude-haiku-5-5';
+
+// How much of the map goes into each request. The map grows with every click;
+// without a cap every translation costs more than the last. Most recent wins.
+const MAX_LOVES = 20;
+const MAX_DISLIKES = 20;
+const MAX_MAP_TITLES = 60;
 
 const DOMAINS: Domain[] = [
 	'film',
@@ -36,74 +45,55 @@ Rules:
 - Each reason must be one crisp sentence that names the aesthetic bridge — texture, mood, or idea — not a generic "fans of X also like Y".
 - Span domains. Don't give 6 films. Cross into music, architecture, food, fashion, visual art.
 - Be confident. No hedging.
-- Output valid JSON only. No prose outside the tool call.`;
+- Emit 5 to 8 recommendations, and at most 4 bridges.`;
 
-const RECOMMEND_TOOL = {
-	name: 'emit_recommendations',
-	description:
-		'Emit aesthetic recommendations that translate the seed across creative domains, plus bridges to existing items on the user\'s map.',
-	input_schema: {
-		type: 'object' as const,
-		properties: {
-			dna: {
-				type: 'string',
-				description:
-					"One or two sentences naming the seed's aesthetic DNA — mood, texture, cultural register."
-			},
-			recommendations: {
-				type: 'array',
-				minItems: 5,
-				maxItems: 8,
-				items: {
-					type: 'object',
-					properties: {
-						title: { type: 'string' },
-						creator: {
-							type: 'string',
-							description:
-								'Artist, director, author, architect, chef, studio — whoever made it. Optional for things like cuisines.'
-						},
-						domain: {
-							type: 'string',
-							enum: DOMAINS
-						},
-						year: {
-							type: ['integer', 'null'],
-							description: 'Year if applicable, else null.'
-						},
-						reason: {
-							type: 'string',
-							description:
-								'One sentence naming the aesthetic bridge from seed to this item.'
-						}
+/** The response shape, enforced by structured outputs (every object closed). */
+const RECOMMEND_SCHEMA = {
+	type: 'object',
+	additionalProperties: false,
+	properties: {
+		dna: {
+			type: 'string',
+			description: "One or two sentences naming the seed's aesthetic DNA — mood, texture, cultural register."
+		},
+		recommendations: {
+			type: 'array',
+			items: {
+				type: 'object',
+				additionalProperties: false,
+				properties: {
+					title: { type: 'string' },
+					creator: {
+						type: 'string',
+						description:
+							'Artist, director, author, architect, chef, studio — whoever made it. Optional for things like cuisines.'
 					},
-					required: ['title', 'domain', 'reason']
-				}
-			},
-			bridges: {
-				type: 'array',
-				maxItems: 4,
-				description:
-					'If the seed shares meaningful aesthetic DNA with items ALREADY on the map, list up to 4 bridges to those existing items by their exact title. Omit or return empty if nothing on the existing map connects.',
-				items: {
-					type: 'object',
-					properties: {
-						existingTitle: {
-							type: 'string',
-							description: 'Exact title of an item already on the map.'
-						},
-						reason: {
-							type: 'string',
-							description:
-								'One crisp sentence naming the specific aesthetic thread linking the new seed to this existing item.'
-						}
-					},
-					required: ['existingTitle', 'reason']
-				}
+					domain: { type: 'string', enum: DOMAINS },
+					year: { anyOf: [{ type: 'integer' }, { type: 'null' }], description: 'Year if applicable, else null.' },
+					reason: { type: 'string', description: 'One sentence naming the aesthetic bridge from seed to this item.' }
+				},
+				required: ['title', 'domain', 'reason']
 			}
 		},
-		required: ['recommendations']
-	}
+		bridges: {
+			type: 'array',
+			description:
+				'Up to 4 links from the seed to items ALREADY on the map, by their exact title. Empty if nothing on the map connects.',
+			items: {
+				type: 'object',
+				additionalProperties: false,
+				properties: {
+					existingTitle: { type: 'string', description: 'Exact title of an item already on the map.' },
+					reason: {
+						type: 'string',
+						description: 'One crisp sentence naming the aesthetic thread linking the new seed to this item.'
+					}
+				},
+				required: ['existingTitle', 'reason']
+			}
+		}
+	},
+	required: ['dna', 'recommendations']
 };
 
 export interface TranslateInput {
@@ -112,8 +102,8 @@ export interface TranslateInput {
 	seedDomain?: Domain | null;
 	loves: string[];
 	dislikes: string[];
-	avoidTitles: string[];
-	existingItems?: string[];
+	/** Every title already on the map (minus the seed): not repeated, and the bridge candidates. */
+	mapTitles: string[];
 	findBridges?: boolean;
 }
 
@@ -123,100 +113,103 @@ export interface TranslateResult {
 	bridges: Bridge[];
 }
 
-export async function translateTaste(input: TranslateInput): Promise<TranslateResult> {
-	const loveLine = input.loves.length
-		? `What the user loves: ${input.loves.join('; ')}.`
-		: '';
-	const hateLine = input.dislikes.length
-		? `What the user has rejected: ${input.dislikes.join('; ')}.`
-		: '';
-	const avoidLine = input.avoidTitles.length
-		? `Do NOT repeat these already-mapped items: ${input.avoidTitles.join('; ')}.`
-		: '';
-	const bridgeLine =
-		input.findBridges && input.existingItems?.length
-			? `Existing items already on the map: ${input.existingItems.join('; ')}. If any share aesthetic DNA with this new seed, emit up to 4 bridges (exact titles match) in the bridges array.`
-			: '';
+const recent = (list: string[], n: number) => list.slice(-n);
 
+export async function translateTaste(input: TranslateInput): Promise<TranslateResult> {
+	const loves = recent(input.loves, MAX_LOVES);
+	const dislikes = recent(input.dislikes, MAX_DISLIKES);
+	const mapTitles = recent(input.mapTitles, MAX_MAP_TITLES);
+
+	// Each title goes in once: the map list both blocks repeats and offers bridges.
 	const userContent = [
 		`Seed item: ${input.seedTitle}${input.seedCreator ? ` — ${input.seedCreator}` : ''}${input.seedDomain ? ` (${input.seedDomain})` : ''}.`,
-		loveLine,
-		hateLine,
-		avoidLine,
-		bridgeLine,
-		'Emit 5–8 recommendations spanning at least 3 creative domains via the emit_recommendations tool.'
+		loves.length ? `What the user loves: ${loves.join('; ')}.` : '',
+		dislikes.length ? `What the user has rejected: ${dislikes.join('; ')}.` : '',
+		mapTitles.length ? `Already on the map — do not recommend any of these again: ${mapTitles.join('; ')}.` : '',
+		input.findBridges && mapTitles.length
+			? 'If any item already on the map shares aesthetic DNA with this seed, add up to 4 bridges to it, using its exact title.'
+			: 'Leave bridges empty.',
+		'Recommend 5 to 8 items spanning at least 3 creative domains.'
 	]
 		.filter(Boolean)
 		.join('\n');
 
-	const response = await getClient().messages.create({
-		model: MODEL,
-		max_tokens: 1600,
-		system: [
-			{
-				type: 'text',
-				text: SYSTEM_PROMPT,
-				cache_control: { type: 'ephemeral' }
-			}
-		],
-		tools: [RECOMMEND_TOOL],
-		tool_choice: { type: 'tool', name: 'emit_recommendations' },
+	// Thinking off (between_tools is Sonnet 5.5's "off"): the old Opus call ran
+	// without it, and thinking is billed as output. Structured outputs replace
+	// the forced tool call, which Sonnet 5.5 doesn't accept. The fallback only
+	// re-runs "cyber"/"frontier_llm" refusals on Sonnet 5; it costs nothing
+	// unless one happens.
+	const response = await getClient().beta.messages.create({
+		model: TRANSLATE_MODEL,
+		max_tokens: 4000,
+		thinking: { type: 'between_tools' },
+		output_config: { effort: 'medium', format: { type: 'json_schema', schema: RECOMMEND_SCHEMA } },
+		betas: ['server-side-fallback-2026-07-01'],
+		fallbacks: 'default',
+		system: SYSTEM_PROMPT,
 		messages: [{ role: 'user', content: userContent }]
 	});
 
-	const toolUse = response.content.find((b) => b.type === 'tool_use');
-	if (!toolUse || toolUse.type !== 'tool_use') {
-		throw new Error('No tool use returned from model');
+	if (response.stop_reason === 'refusal') {
+		throw new Error('The translator passed on this one. Try a different seed.');
 	}
+	const text = response.content.find((b) => b.type === 'text');
+	if (!text || text.type !== 'text') throw new Error('The translator returned nothing. Try again.');
 
-	const parsed = toolUse.input as {
-		dna?: string;
+	const parsed = JSON.parse(text.text) as {
+		dna: string;
 		recommendations: Recommendation[];
 		bridges?: Bridge[];
 	};
 
 	return {
-		dna: parsed.dna ?? '',
-		recommendations: (parsed.recommendations ?? []).map((r) => ({
+		dna: parsed.dna,
+		recommendations: parsed.recommendations.slice(0, 8).map((r) => ({
 			...r,
 			domain: (DOMAINS.includes(r.domain as Domain) ? r.domain : 'other') as Domain
 		})),
-		bridges: parsed.bridges ?? []
+		bridges: (parsed.bridges ?? []).slice(0, 4)
 	};
 }
 
+const CLASSIFY_SCHEMA = {
+	type: 'object',
+	additionalProperties: false,
+	properties: {
+		title: { type: 'string' },
+		creator: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+		domain: { type: 'string', enum: DOMAINS },
+		year: { anyOf: [{ type: 'integer' }, { type: 'null' }] }
+	},
+	required: ['title', 'creator', 'domain', 'year']
+};
+
+/** What a typed seed is (domain, creator), for its card and thumbnail. Never fails. */
 export async function classifySeed(
 	text: string
 ): Promise<{ title: string; creator?: string; domain: Domain; year?: number | null }> {
+	const fallback = { title: text, domain: 'other' as Domain };
 	const response = await getClient().messages.create({
-		model: 'claude-haiku-4-5-20251001',
-		max_tokens: 300,
-		system:
-			'You classify a freeform taste seed into structured metadata. Return ONLY a JSON object with keys: title, creator (optional), domain (one of film, tv, music, book, visual-art, architecture, fashion, food, game, other), year (int or null). No prose.',
-		messages: [
-			{
-				role: 'user',
-				content: `Classify: "${text}"`
-			}
-		]
+		model: CLASSIFY_MODEL,
+		max_tokens: 1000,
+		// A lookup needs no reasoning; thinking is billed as output.
+		thinking: { type: 'disabled' },
+		output_config: { format: { type: 'json_schema', schema: CLASSIFY_SCHEMA } },
+		system: 'You classify a freeform taste seed (a film, record, book, place, dish…) into structured metadata.',
+		messages: [{ role: 'user', content: `Classify: "${text}"` }]
 	});
 
-	const text_block = response.content.find((b) => b.type === 'text');
-	if (!text_block || text_block.type !== 'text') {
-		return { title: text, domain: 'other' };
-	}
-	const raw = text_block.text.trim();
-	const jsonMatch = raw.match(/\{[\s\S]*\}/);
-	if (!jsonMatch) return { title: text, domain: 'other' };
+	const block = response.content.find((b) => b.type === 'text');
+	if (response.stop_reason === 'refusal' || !block || block.type !== 'text') return fallback;
 	try {
-		const parsed = JSON.parse(jsonMatch[0]);
+		const parsed = JSON.parse(block.text);
 		return {
-			title: parsed.title ?? text,
-			creator: parsed.creator,
+			title: parsed.title || text,
+			creator: parsed.creator ?? undefined,
 			domain: (DOMAINS.includes(parsed.domain) ? parsed.domain : 'other') as Domain,
 			year: parsed.year ?? null
 		};
 	} catch {
-		return { title: text, domain: 'other' };
+		return fallback;
 	}
 }

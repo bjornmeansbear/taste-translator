@@ -18,6 +18,11 @@
 	   Text on it: wjerk-black 11.81, gray-6 6.32. */
 	--color-tint: var(--white-4);
 
+	/* The canvas is a deeper paper than the cards and chrome on it, so cards
+	   read as sheets on a desk (5.5 apart in OKLab). Drawn straight on it:
+	   ink edges 11.81, gray-6 edges and the zoom label 6.32, pink edges 4.11. */
+	--color-canvas: var(--white-4);
+
 	/* Graph edges. One variable per channel: hue = how much you love it
 	   (pink vs ink), dash = kind (solid child, dashed bridge, dotted manual),
 	   weight = strength. Plain edges are gray-6 so the pink ones lead
@@ -38,7 +43,7 @@
 	:root {
 		color-scheme: dark;
 		--color-bg: var(--brown-9);
-		--color-surface: var(--brown-9);
+		--color-surface: var(--brown-8); /* cards lift a step off the canvas */
 		--color-surface-2: var(--brown-9);
 		--color-text: var(--brown-0); /* 18.81:1 */
 		--color-text-muted: var(--brown-3); /* 10.49:1 */
@@ -49,6 +54,7 @@
 		--color-danger: var(--red-3); /* 9.98:1 */
 
 		--color-tint: var(--brown-8); /* brown-0 16.79, brown-3 9.37, pink-3 7.85 */
+		--color-canvas: var(--brown-9); /* cards on brown-8: the same 16.79 / 9.37 / 7.85 */
 		--color-edge: var(--brown-3);
 		/* core cards on pink-8: brown-0 15.37, brown-3 8.58, pink-3 rule 7.19 */
 	}
@@ -83,6 +89,7 @@
 	--color-accent-subtle: var(--color-accent-subtle);
 	--color-danger: var(--color-danger);
 	--color-tint: var(--color-tint);
+	--color-canvas: var(--color-canvas);
 	--color-edge: var(--color-edge);
 	--color-edge-seed: var(--color-edge-seed);
 	--color-edge-love: var(--color-edge-love);

@@ -61,7 +61,6 @@
 				body: JSON.stringify({
 					loves: graph.lovedTitles(),
 					dislikes: graph.dislikedTitles(),
-					avoidTitles: graph.allTitles(),
 					...body
 				})
 			});
@@ -96,7 +95,7 @@
 			seedDomain: seed.domain,
 			classify: false,
 			findBridges: true,
-			existingItems: graph.allTitles().filter((t) => t !== seed.title)
+			mapTitles: graph.allTitles().filter((t) => t !== seed.title)
 		});
 		graph.loadingId = null;
 		if (!data) return;
@@ -112,7 +111,7 @@
 		const data = await requestTranslation({
 			seedTitle: text,
 			classify: true,
-			existingItems: graph.allTitles(),
+			mapTitles: graph.allTitles(),
 			findBridges: !isFirstSeed,
 			fetchSeedThumb: true
 		});
