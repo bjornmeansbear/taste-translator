@@ -12,8 +12,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
 	"devDependencies": {
-		"@skeletonlabs/skeleton": "^3.2.2",
-		"@skeletonlabs/skeleton-svelte": "^1.5.3",
+		"@fontsource-variable/fraunces": "^5.3.0",
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/kit": "^2.57.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",

@@ -43,10 +43,10 @@
 	<div class="seed-card">
 		{#if centered}
 			<div class="brand">
-				<div class="mark">◉</div>
-				<div class="title">Taste Translator</div>
+				<div class="mark" aria-hidden="true">◉</div>
+				<h1 class="title">Taste Translator</h1>
 			</div>
-			<div class="tagline">A living map of your aesthetic universe.</div>
+			<p class="tagline">A living map of your aesthetic universe.</p>
 		{/if}
 		<div class="input-row">
 			<input
@@ -67,7 +67,7 @@
 			</button>
 		</div>
 		{#if error}
-			<div class="error">{error}</div>
+			<div class="error" role="alert">{error}</div>
 		{/if}
 		{#if centered}
 			<div class="hint">
@@ -83,127 +83,128 @@
 		z-index: 30;
 		left: 50%;
 		transform: translateX(-50%);
-		top: 24px;
-		width: min(560px, calc(100vw - 32px));
+		top: 1rem;
+		width: min(35rem, calc(100vw - 2rem));
 		transition:
 			top 700ms cubic-bezier(0.2, 0.9, 0.2, 1),
 			width 700ms cubic-bezier(0.2, 0.9, 0.2, 1);
 	}
 
 	.seed-wrap.centered {
-		top: 28vh;
-		width: min(620px, calc(100vw - 32px));
+		top: 20vh;
+		width: min(39rem, calc(100vw - 2rem));
+	}
+
+	/* Phone, once the map exists: leave the top-right corner to the list button. */
+	@media (max-width: 39.99rem) {
+		.seed-wrap:not(.centered) {
+			left: calc(50% - 1.5rem);
+			width: calc(100vw - 5rem);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.seed-wrap {
+			transition: none;
+		}
 	}
 
 	.seed-card {
-		background: linear-gradient(
-			150deg,
-			rgba(18, 16, 32, 0.78),
-			rgba(10, 9, 20, 0.66)
-		);
-		backdrop-filter: blur(22px) saturate(140%);
-		-webkit-backdrop-filter: blur(22px) saturate(140%);
-		border: 1px solid rgba(255, 255, 255, 0.09);
-		border-radius: 18px;
-		padding: 14px;
-		box-shadow:
-			0 1px 0 rgba(255, 255, 255, 0.05) inset,
-			0 20px 60px -20px rgba(0, 0, 0, 0.8);
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		padding: 0.75rem;
 	}
 
+	/* The landing state earns the thick frame. */
 	.centered .seed-card {
-		padding: 28px 28px 22px;
+		border-width: 2px;
+		padding: 1.5rem;
 	}
 
 	.brand {
 		display: flex;
-		align-items: center;
-		gap: 12px;
-		margin-bottom: 6px;
+		align-items: baseline;
+		gap: 0.75rem;
 	}
 	.mark {
-		font-size: 22px;
-		color: rgba(244, 114, 182, 0.9);
-		filter: drop-shadow(0 0 10px rgba(244, 114, 182, 0.6));
+		font-size: var(--text-lg);
+		line-height: var(--leading-lg);
+		color: var(--color-accent);
 	}
 	.title {
-		font-family: 'Fraunces', ui-serif, Georgia, serif;
-		font-size: 26px;
+		font-family: var(--font-display);
+		font-size: var(--text-xl);
+		line-height: var(--leading-xl);
 		font-weight: 600;
-		letter-spacing: 0.005em;
-		color: rgba(248, 250, 252, 0.97);
+		margin: 0;
 	}
 
 	.tagline {
-		font-size: 13px;
-		color: rgba(203, 213, 225, 0.65);
-		margin-bottom: 22px;
+		font-family: var(--font-display);
 		font-style: italic;
-		font-family: 'Fraunces', ui-serif, Georgia, serif;
+		font-size: var(--text-base);
+		line-height: var(--leading-base);
+		color: var(--color-text-muted);
+		margin: 0 0 1.5rem;
 	}
 
 	.input-row {
 		display: flex;
-		gap: 10px;
 		align-items: stretch;
 	}
 
 	.seed-input {
 		flex: 1;
-		background: rgba(8, 7, 16, 0.6);
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		border-radius: 12px;
-		padding: 12px 16px;
-		color: rgba(248, 250, 252, 0.95);
-		font-size: 14px;
-		outline: none;
-		transition: border-color 200ms ease, background 200ms ease;
+		min-width: 0;
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		border-right: none;
+		padding: 0.6875rem 0.875rem;
+		color: var(--color-text);
+		/* 16px keeps iOS from zooming in on focus. */
+		font-size: var(--text-base);
+		line-height: var(--leading-base);
 		font-family: inherit;
 	}
 	.seed-input::placeholder {
-		color: rgba(148, 163, 184, 0.5);
-	}
-	.seed-input:focus {
-		border-color: rgba(167, 139, 250, 0.6);
-		background: rgba(8, 7, 16, 0.9);
+		color: var(--color-text-muted);
+		opacity: 1;
 	}
 	.seed-input:disabled {
-		opacity: 0.6;
+		background: var(--color-tint);
 	}
 
 	.send {
-		background: linear-gradient(135deg, rgba(167, 139, 250, 0.95), rgba(244, 114, 182, 0.9));
-		color: rgba(10, 9, 20, 0.95);
-		border: none;
-		border-radius: 12px;
-		width: 48px;
+		background: var(--color-accent);
+		color: var(--color-bg);
+		border: 1px solid var(--color-accent);
+		width: 3rem;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		font-size: 18px;
-		font-weight: 700;
-		transition: transform 150ms ease, opacity 200ms ease, filter 200ms ease;
-		box-shadow: 0 8px 24px -8px rgba(167, 139, 250, 0.6);
+		font-size: var(--text-md);
+		font-weight: bold;
 	}
-	.send:hover:not(:disabled) {
-		transform: translateY(-1px);
-		filter: brightness(1.1);
+	.send:active:not(:disabled) {
+		background: var(--color-accent-hover);
+		border-color: var(--color-accent-hover);
 	}
+	/* Disabled is shown by the rule alone, not a faded pink: the glyph keeps
+	   full contrast so it never drops below AA. */
 	.send:disabled {
-		opacity: 0.35;
+		background: var(--color-bg);
+		border-color: var(--color-border);
+		color: var(--color-text-muted);
 		cursor: not-allowed;
-	}
-	.arrow {
-		transform: rotate(0deg);
 	}
 
 	.spinner {
-		width: 16px;
-		height: 16px;
-		border: 2px solid rgba(10, 9, 20, 0.3);
-		border-top-color: rgba(10, 9, 20, 0.95);
-		border-radius: 50%;
+		width: 1rem;
+		height: 1rem;
+		border: 2px solid var(--color-tint);
+		border-top-color: var(--color-text);
+		border-radius: 999px;
 		animation: spin 800ms linear infinite;
 	}
 	@keyframes spin {
@@ -211,19 +212,26 @@
 			transform: rotate(360deg);
 		}
 	}
+	@media (prefers-reduced-motion: reduce) {
+		.spinner {
+			animation-duration: 2400ms;
+		}
+	}
 
 	.error {
-		margin-top: 10px;
-		font-size: 12px;
-		color: rgba(251, 146, 146, 0.9);
+		margin-top: 0.75rem;
+		font-size: var(--text-sm);
+		line-height: var(--leading-sm);
+		color: var(--color-danger);
 	}
 
 	.hint {
-		margin-top: 16px;
-		font-size: 10px;
-		letter-spacing: 0.18em;
+		margin-top: 1.125rem;
+		font-size: var(--text-2xs);
+		line-height: var(--leading-2xs);
+		letter-spacing: 0.12em;
 		text-transform: uppercase;
-		color: rgba(148, 163, 184, 0.4);
+		color: var(--color-text-muted);
 		text-align: center;
 	}
 </style>

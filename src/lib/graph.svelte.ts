@@ -1,6 +1,6 @@
 import type { Node, Edge, Rating, Recommendation } from './types';
-import { RATINGS } from './types';
-import { saveExploration, loadExploration } from './storage';
+import { ratingFor } from './types';
+import { saveExploration, loadExploration, deleteExploration } from './storage';
 import type { ExplorationSave } from './storage';
 
 function uid() {
@@ -8,8 +8,7 @@ function uid() {
 }
 
 function ratingWeight(r: Rating | null): number {
-	if (!r) return 0;
-	return RATINGS.find((x) => x.value === r)?.weight ?? 0;
+	return ratingFor(r)?.weight ?? 0;
 }
 
 class Graph {
@@ -22,6 +21,8 @@ class Graph {
 
 	// Persistence
 	explorationId = $state<string | null>(null);
+	/** Bumped by every edit worth saving; the page's auto-save watches it. */
+	revision = $state(0);
 
 	byId = $derived.by(() => {
 		const m = new Map<string, Node>();
@@ -48,6 +49,7 @@ class Graph {
 			...n
 		} as Node;
 		this.nodes.push(node);
+		this.revision++;
 		return node;
 	}
 
@@ -57,6 +59,7 @@ class Graph {
 			return;
 		}
 		this.edges.push({ from, to, kind, reason });
+		this.revision++;
 	}
 
 	findByTitle(title: string) {
@@ -69,12 +72,15 @@ class Graph {
 
 	rate(id: string, rating: Rating | null) {
 		const n = this.nodes.find((x) => x.id === id);
-		if (n) n.rating = rating;
+		if (!n) return;
+		n.rating = rating;
+		this.revision++;
 	}
 
 	remove(id: string) {
 		this.nodes = this.nodes.filter((n) => n.id !== id);
 		this.edges = this.edges.filter((e) => e.from !== id && e.to !== id);
+		this.revision++;
 	}
 
 	ingestRecommendations(
@@ -147,6 +153,12 @@ class Graph {
 		this.edges = [];
 		this.dna = {};
 		this.explorationId = uid();
+	}
+
+	/** Wipe the current map, in storage too, and carry on with a fresh one. */
+	clear() {
+		if (this.explorationId) deleteExploration(this.explorationId);
+		this.startNew();
 	}
 
 	/** Save current state to localStorage. */

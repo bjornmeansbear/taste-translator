@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
+	import { onMount, untrack } from 'svelte';
 	import { graph } from '$lib/graph.svelte';
+	import type { Edge } from '$lib/types';
 	import NodeCard from './NodeCard.svelte';
+	import Legend from './Legend.svelte';
 
 	type Props = {
 		onExpand: (id: string) => void;
@@ -10,32 +11,33 @@
 
 	let { onExpand }: Props = $props();
 
-	let wrapper: HTMLDivElement;
-	let viewport = $state({
-		x: 0,
-		y: 0,
-		scale: 1
-	});
+	const MIN_SCALE = 0.18;
+	const MAX_SCALE = 2.5;
+	const HALF = 20000; // half-size of the edge layer, in world px
 
-	// Smooth viewport animation target
+	let wrapper: HTMLDivElement;
+	let viewport = $state({ x: 0, y: 0, scale: 1 });
+	// Where the viewport is easing to; null when it's at rest.
 	let viewportTarget = $state<{ x: number; y: number; scale: number } | null>(null);
 
+	// Pointer gestures: pan the canvas, drag a card, or drag a new link.
 	let panning = $state(false);
 	let panStart = { x: 0, y: 0, vx: 0, vy: 0 };
-
-	// Node drag state
-	let draggingNode = $state<{
-		id: string;
-		startCx: number;
-		startCy: number;
-		startNx: number;
-		startNy: number;
-	} | null>(null);
-
-	// Drag-to-connect state
-	let connecting = $state<{ from: string; x: number; y: number; hoverId: string | null } | null>(
+	let draggingNode = $state<{ id: string; startCx: number; startCy: number; startNx: number; startNy: number } | null>(
 		null
 	);
+	let connecting = $state<{ from: string; x: number; y: number; hoverId: string | null } | null>(null);
+
+	// Tap-to-select: hover can't reach the card controls on a touch screen, so a
+	// tap (press and release without moving) selects a card and shows them.
+	// A tap on empty canvas or Esc clears it. Keyboard focus selects too.
+	let selectedId = $state<string | null>(null);
+	let downAt = { x: 0, y: 0 };
+	const TAP_SLOP = 6;
+
+	// Presses on these belong to their own controls, not to the canvas: capturing
+	// the pointer here would swallow their clicks.
+	const NOT_CANVAS = '.link-handle, .actions, .rating-menu, .canvas-controls, dialog';
 
 	function clientToWorld(cx: number, cy: number) {
 		const rect = wrapper.getBoundingClientRect();
@@ -45,38 +47,26 @@
 		};
 	}
 
+	/** The viewport that puts world point (x, y) at the centre of the screen. */
+	function centerOn(x: number, y: number, scale = viewport.scale) {
+		const rect = wrapper.getBoundingClientRect();
+		return { x: rect.width / 2 - x * scale, y: rect.height / 2 - y * scale, scale };
+	}
+
 	function centerOnSeed() {
 		const seed = graph.anchorNode;
-		if (!seed || !wrapper) return;
-		const rect = wrapper.getBoundingClientRect();
-		viewportTarget = {
-			x: rect.width / 2 - seed.x * viewport.scale,
-			y: rect.height / 2 - seed.y * viewport.scale,
-			scale: viewport.scale
-		};
+		if (seed) viewportTarget = centerOn(seed.x, seed.y);
 	}
 
 	function fitAll() {
-		if (graph.nodes.length === 0 || !wrapper) return;
-		const rect = wrapper.getBoundingClientRect();
-		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-		for (const n of graph.nodes) {
-			if (n.x < minX) minX = n.x;
-			if (n.y < minY) minY = n.y;
-			if (n.x > maxX) maxX = n.x;
-			if (n.y > maxY) maxY = n.y;
-		}
+		if (graph.nodes.length === 0) return;
+		const xs = graph.nodes.map((n) => n.x);
+		const ys = graph.nodes.map((n) => n.y);
+		const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
 		const pad = 160;
-		const contentW = maxX - minX + pad * 2;
-		const contentH = maxY - minY + pad * 2;
-		const scale = Math.min(2.0, Math.max(0.18, Math.min(rect.width / contentW, rect.height / contentH)));
-		const cx = (minX + maxX) / 2;
-		const cy = (minY + maxY) / 2;
-		viewportTarget = {
-			x: rect.width / 2 - cx * scale,
-			y: rect.height / 2 - cy * scale,
-			scale
-		};
+		const rect = wrapper.getBoundingClientRect();
+		const fit = Math.min(rect.width / (maxX - minX + pad * 2), rect.height / (maxY - minY + pad * 2));
+		viewportTarget = centerOn((minX + maxX) / 2, (minY + maxY) / 2, Math.min(2, Math.max(MIN_SCALE, fit)));
 	}
 
 	onMount(() => {
@@ -84,33 +74,24 @@
 		const LERP = 0.14;
 		const tick = () => {
 			graph.step(1);
-			// Smooth viewport animation toward target
-			if (viewportTarget) {
-				viewport.x += (viewportTarget.x - viewport.x) * LERP;
-				viewport.y += (viewportTarget.y - viewport.y) * LERP;
-				viewport.scale += (viewportTarget.scale - viewport.scale) * LERP;
-				if (
-					Math.abs(viewport.x - viewportTarget.x) < 0.5 &&
-					Math.abs(viewport.y - viewportTarget.y) < 0.5 &&
-					Math.abs(viewport.scale - viewportTarget.scale) < 0.001
-				) {
-					viewport.x = viewportTarget.x;
-					viewport.y = viewportTarget.y;
-					viewport.scale = viewportTarget.scale;
+			const t = viewportTarget;
+			if (t) {
+				viewport.x += (t.x - viewport.x) * LERP;
+				viewport.y += (t.y - viewport.y) * LERP;
+				viewport.scale += (t.scale - viewport.scale) * LERP;
+				const settled =
+					Math.abs(viewport.x - t.x) < 0.5 &&
+					Math.abs(viewport.y - t.y) < 0.5 &&
+					Math.abs(viewport.scale - t.scale) < 0.001;
+				if (settled) {
+					viewport = { ...t };
 					viewportTarget = null;
 				}
 			}
 			raf = requestAnimationFrame(tick);
 		};
 		raf = requestAnimationFrame(tick);
-		// Initial center (snap, no animation)
-		const seed = graph.anchorNode;
-		if (seed && wrapper) {
-			const rect = wrapper.getBoundingClientRect();
-			viewport.x = rect.width / 2 - seed.x * viewport.scale;
-			viewport.y = rect.height / 2 - seed.y * viewport.scale;
-		}
-		const onResize = () => { if (graph.nodes.length > 0) fitAll(); };
+		const onResize = () => fitAll();
 		window.addEventListener('resize', onResize);
 		return () => {
 			cancelAnimationFrame(raf);
@@ -118,143 +99,110 @@
 		};
 	});
 
-	let didInitialCenter = false;
+	// Snap (no animation) to the anchor whenever there's a new one: the first
+	// seed of a fresh map, or a different exploration loaded.
 	$effect(() => {
-		if (!browser) return;
-		if (!didInitialCenter && graph.anchorNode) {
-			didInitialCenter = true;
-			queueMicrotask(() => {
-				const seed = graph.anchorNode;
-				if (!seed || !wrapper) return;
-				const rect = wrapper.getBoundingClientRect();
-				viewport.x = rect.width / 2 - seed.x * viewport.scale;
-				viewport.y = rect.height / 2 - seed.y * viewport.scale;
-			});
-		}
+		const seed = graph.anchorNode;
+		if (seed) untrack(() => (viewport = centerOn(seed.x, seed.y)));
 	});
 
-	// Watch graph.focusId and animate to that node
+	// Something asked to bring a card into view (node list, keyboard, touch).
 	$effect(() => {
 		const id = graph.focusId;
-		if (!id || !wrapper) return;
-		const node = graph.byId.get(id);
-		if (!node) return;
-		const rect = wrapper.getBoundingClientRect();
-		const targetScale = Math.max(0.75, Math.min(1.5, viewport.scale));
-		viewportTarget = {
-			x: rect.width / 2 - node.x * targetScale,
-			y: rect.height / 2 - node.y * targetScale,
-			scale: targetScale
-		};
-		queueMicrotask(() => { graph.focusId = null; });
+		if (!id) return;
+		untrack(() => {
+			const node = graph.byId.get(id);
+			if (node) viewportTarget = centerOn(node.x, node.y, Math.max(0.75, Math.min(1.5, viewport.scale)));
+			graph.focusId = null;
+		});
 	});
 
 	function onWheel(e: WheelEvent) {
 		e.preventDefault();
-		viewportTarget = null; // cancel animation on user scroll
+		viewportTarget = null; // the user takes over
 		const rect = wrapper.getBoundingClientRect();
 		const mx = e.clientX - rect.left;
 		const my = e.clientY - rect.top;
-		const dir = e.deltaY > 0 ? 0.92 : 1.08;
-		const newScale = Math.min(2.5, Math.max(0.18, viewport.scale * dir));
+		const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, viewport.scale * (e.deltaY > 0 ? 0.92 : 1.08)));
+		// Zoom about the pointer: the world point under it stays put.
 		const wx = (mx - viewport.x) / viewport.scale;
 		const wy = (my - viewport.y) / viewport.scale;
-		viewport.scale = newScale;
-		viewport.x = mx - wx * newScale;
-		viewport.y = my - wy * newScale;
+		viewport = { x: mx - wx * scale, y: my - wy * scale, scale };
 	}
 
 	function onPointerDown(e: PointerEvent) {
-		viewportTarget = null; // cancel animation on any pointer input
 		const target = e.target as HTMLElement;
+		if (target.closest(NOT_CANVAS)) return;
+		viewportTarget = null; // the user takes over
+		downAt = { x: e.clientX, y: e.clientY };
 
-		// Let the link-handle handle itself (it captures pointer for connect)
-		if (target.closest('.link-handle')) return;
-		// Let action buttons / rating menu be
-		if (target.closest('.actions, .rating-menu')) return;
-
-		// Node card body → start node drag
-		const card = target.closest('[data-node-id]') as HTMLElement | null;
-		if (card) {
-			const id = card.dataset.nodeId!;
-			const node = graph.byId.get(id);
-			if (node) {
-				draggingNode = { id, startCx: e.clientX, startCy: e.clientY, startNx: node.x, startNy: node.y };
-				try { wrapper.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-				return;
-			}
+		const id = (target.closest('[data-node-id]') as HTMLElement | null)?.dataset.nodeId;
+		const node = id ? graph.byId.get(id) : undefined;
+		if (node) {
+			draggingNode = { id: node.id, startCx: e.clientX, startCy: e.clientY, startNx: node.x, startNy: node.y };
+		} else {
+			panning = true;
+			panStart = { x: e.clientX, y: e.clientY, vx: viewport.x, vy: viewport.y };
 		}
-
-		// Canvas background → pan
-		panning = true;
-		panStart = { x: e.clientX, y: e.clientY, vx: viewport.x, vy: viewport.y };
-		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+		wrapper.setPointerCapture(e.pointerId);
 	}
 
 	function onPointerMove(e: PointerEvent) {
 		if (connecting) {
 			const w = clientToWorld(e.clientX, e.clientY);
-			connecting.x = w.x;
-			connecting.y = w.y;
-			const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-			const card = el?.closest('[data-node-id]') as HTMLElement | null;
-			const id = card?.dataset.nodeId ?? null;
-			connecting.hoverId = id && id !== connecting.from ? id : null;
-			return;
-		}
-		if (draggingNode) {
+			const el = document.elementFromPoint(e.clientX, e.clientY);
+			const id = (el?.closest('[data-node-id]') as HTMLElement | null)?.dataset.nodeId ?? null;
+			connecting = { ...connecting, x: w.x, y: w.y, hoverId: id !== connecting.from ? id : null };
+		} else if (draggingNode) {
 			const node = graph.byId.get(draggingNode.id);
-			if (node) {
-				const dx = (e.clientX - draggingNode.startCx) / viewport.scale;
-				const dy = (e.clientY - draggingNode.startCy) / viewport.scale;
-				node.x = draggingNode.startNx + dx;
-				node.y = draggingNode.startNy + dy;
-				node.vx = 0;
-				node.vy = 0;
-			}
-			return;
+			if (!node) return;
+			node.x = draggingNode.startNx + (e.clientX - draggingNode.startCx) / viewport.scale;
+			node.y = draggingNode.startNy + (e.clientY - draggingNode.startCy) / viewport.scale;
+			node.vx = 0;
+			node.vy = 0;
+		} else if (panning) {
+			viewport.x = panStart.vx + (e.clientX - panStart.x);
+			viewport.y = panStart.vy + (e.clientY - panStart.y);
 		}
-		if (!panning) return;
-		viewport.x = panStart.vx + (e.clientX - panStart.x);
-		viewport.y = panStart.vy + (e.clientY - panStart.y);
 	}
 
 	function onPointerUp(e: PointerEvent) {
-		if (connecting) {
-			if (connecting.hoverId && connecting.hoverId !== connecting.from) {
-				graph.connect(connecting.from, connecting.hoverId, 'manual');
-			}
-			connecting = null;
+		if (connecting?.hoverId) graph.connect(connecting.from, connecting.hoverId, 'manual');
+		connecting = null;
+
+		const tapped = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < TAP_SLOP;
+		if (draggingNode && tapped) {
+			selectedId = draggingNode.id;
+			// On touch, bring the card and its controls fully on screen.
+			if (e.pointerType !== 'mouse') graph.focusId = draggingNode.id;
+		} else if (draggingNode) {
+			graph.revision++; // a card was moved by hand: worth saving
+		} else if (panning && tapped) {
+			selectedId = null;
 		}
 		draggingNode = null;
 		panning = false;
-		try {
-			(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-		} catch {
-			/* ignore */
-		}
+		if (wrapper.hasPointerCapture(e.pointerId)) wrapper.releasePointerCapture(e.pointerId);
 	}
 
 	function handleConnectStart(fromId: string, e: PointerEvent) {
 		const w = clientToWorld(e.clientX, e.clientY);
 		connecting = { from: fromId, x: w.x, y: w.y, hoverId: null };
-		try {
-			wrapper.setPointerCapture(e.pointerId);
-		} catch {
-			/* ignore */
-		}
+		wrapper.setPointerCapture(e.pointerId);
 	}
 
 	function onKey(e: KeyboardEvent) {
-		if (e.key === 'Escape' && connecting) connecting = null;
+		if (e.key !== 'Escape' || e.defaultPrevented) return;
+		if (connecting) connecting = null;
+		else selectedId = null;
 	}
 
-	function edgePath(ax: number, ay: number, bx: number, by: number, seedA: string, seedB: string): string {
+	/** A gently bowed line; the bow is seeded by the ids so it never jitters. */
+	function edgePath(ax: number, ay: number, bx: number, by: number, seed: string): string {
 		const dx = bx - ax;
 		const dy = by - ay;
 		const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-		const h = hash(seedA + seedB);
-		const offset = ((h % 40) - 20) * 0.6;
+		const offset = ((hash(seed) % 40) - 20) * 0.6;
 		const mx = (ax + bx) / 2 + (-dy / dist) * offset;
 		const my = (ay + by) / 2 + (dx / dist) * offset;
 		return `M ${ax} ${ay} Q ${mx} ${my} ${bx} ${by}`;
@@ -266,44 +214,53 @@
 		return Math.abs(h);
 	}
 
-	function edgeOpacity(fromId: string, toId: string, kind?: string): number {
-		const a = graph.byId.get(fromId);
-		const b = graph.byId.get(toId);
-		if (!a || !b) return 0;
-		if (!graph.showExiled && (a.rating === 'exile' || b.rating === 'exile')) return 0;
-		if (a.rating === 'exile' || b.rating === 'exile') return 0.06;
-		if (a.rating === 'dislike' || b.rating === 'dislike') return 0.18;
-		if (a.rating === 'core' || b.rating === 'core') return 0.85;
-		if (a.rating === 'love' || b.rating === 'love') return 0.6;
-		if (kind === 'bridge' || kind === 'manual') return 0.5;
-		return 0.35;
+	/**
+	 * How an edge is drawn. One variable per channel (RULES.md "Data on screen"):
+	 * hue = preference (pink if you love an end, ink from a seed, gray otherwise),
+	 * dash = kind, weight = strength. Opacity only fades rejected work; everything
+	 * else stays opaque so the line colors hold their measured contrast. Widths
+	 * and dashes are divided by the zoom so the line work is constant on screen.
+	 */
+	function edgeLook(e: Edge) {
+		const a = graph.byId.get(e.from);
+		const b = graph.byId.get(e.to);
+		if (!a || !b) return null;
+		const either = (r: string) => a.rating === r || b.rating === r;
+		const px = 1 / viewport.scale;
+		const loved = either('core') || either('love');
+		return {
+			a,
+			b,
+			cls: loved ? 'edge edge-love' : a.parentId === null || b.parentId === null ? 'edge edge-seed' : 'edge',
+			width: (either('core') ? 2 : either('love') ? 1.5 : 1) * px,
+			opacity: either('exile') ? (graph.showExiled ? 0.15 : 0) : either('dislike') ? 0.35 : 1,
+			dash: e.kind === 'bridge' ? `${6 * px} ${6 * px}` : e.kind === 'manual' ? `${px} ${4 * px}` : undefined
+		};
 	}
 
-	function edgeColor(fromId: string, toId: string, kind?: string): string {
-		const a = graph.byId.get(fromId);
-		const b = graph.byId.get(toId);
-		if (!a || !b) return 'rgba(255,255,255,0.5)';
-		if (a.rating === 'core' || b.rating === 'core') return 'rgba(244,114,182,0.9)';
-		if (a.rating === 'love' || b.rating === 'love') return 'rgba(167,139,250,0.8)';
-		if (kind === 'manual') return 'rgba(252,211,77,0.85)';
-		if (kind === 'bridge') return 'rgba(134,239,172,0.7)';
-		if (a.parentId === null || b.parentId === null) return 'rgba(125,211,252,0.8)';
-		return 'rgba(203,213,225,0.6)';
-	}
-
-	function edgeDash(kind?: string): string | undefined {
-		if (kind === 'bridge') return '5 4';
-		return undefined;
-	}
-
-	const isDraggingNode = $derived(!!draggingNode);
-	const HALF = 20000;
+	// Dot grid: the 6px rhythm on the canvas, one dot per 24 world px (4 units),
+	// so panning and zooming read against something. Thins by halves when the
+	// dots would crowd closer than 18 screen px.
+	const grid = $derived.by(() => {
+		let step = 24;
+		while (step * viewport.scale < 18) step *= 2;
+		const size = step * viewport.scale;
+		return { size, x: viewport.x % size, y: viewport.y % size };
+	});
 </script>
 
 <svelte:window onkeydown={onKey} />
 
 <div
 	class="canvas-wrapper"
+	style:background-size="{grid.size}px {grid.size}px"
+	style:background-position="{grid.x}px {grid.y}px"
+	onscroll={() => {
+		// Focusing a card can make the browser scroll this box to it; the
+		// viewport transform does the moving here, so undo that.
+		wrapper.scrollTop = 0;
+		wrapper.scrollLeft = 0;
+	}}
 	bind:this={wrapper}
 	onwheel={onWheel}
 	onpointerdown={onPointerDown}
@@ -312,7 +269,7 @@
 	onpointercancel={onPointerUp}
 	class:panning
 	class:connecting={!!connecting}
-	class:dragging-node={isDraggingNode}
+	class:dragging-node={!!draggingNode}
 	role="application"
 >
 	<div
@@ -327,28 +284,17 @@
 			style="left: {-HALF}px; top: {-HALF}px;"
 			aria-hidden="true"
 		>
-			<defs>
-				<filter id="edge-glow" x="-50%" y="-50%" width="200%" height="200%">
-					<feGaussianBlur stdDeviation="2" result="blur" />
-					<feMerge>
-						<feMergeNode in="blur" />
-						<feMergeNode in="SourceGraphic" />
-					</feMerge>
-				</filter>
-			</defs>
 			{#each graph.edges as e (e.from + '-' + e.to)}
-				{@const a = graph.byId.get(e.from)}
-				{@const b = graph.byId.get(e.to)}
-				{#if a && b}
+				{@const look = edgeLook(e)}
+				{#if look}
 					<path
-						d={edgePath(a.x, a.y, b.x, b.y, e.from, e.to)}
-						stroke={edgeColor(e.from, e.to, e.kind)}
-						stroke-width={1.2 / viewport.scale + 0.4}
+						d={edgePath(look.a.x, look.a.y, look.b.x, look.b.y, e.from + e.to)}
+						class={look.cls}
+						stroke-width={look.width}
 						fill="none"
-						opacity={edgeOpacity(e.from, e.to, e.kind)}
+						opacity={look.opacity}
 						stroke-linecap="round"
-						stroke-dasharray={edgeDash(e.kind)}
-						filter="url(#edge-glow)"
+						stroke-dasharray={look.dash}
 					>
 						{#if e.reason}
 							<title>{e.reason}</title>
@@ -361,13 +307,12 @@
 				{@const from = graph.byId.get(connecting.from)}
 				{#if from}
 					<path
-						d={edgePath(from.x, from.y, connecting.x, connecting.y, connecting.from, 'drag')}
-						stroke="rgba(252,211,77,0.9)"
-						stroke-width={1.6 / viewport.scale + 0.6}
+						d={edgePath(from.x, from.y, connecting.x, connecting.y, connecting.from + 'drag')}
+						class="edge edge-love"
+						stroke-width={2 / viewport.scale}
 						fill="none"
 						stroke-linecap="round"
-						stroke-dasharray="6 4"
-						filter="url(#edge-glow)"
+						stroke-dasharray="{6 / viewport.scale} {6 / viewport.scale}"
 					/>
 				{/if}
 			{/if}
@@ -378,8 +323,12 @@
 				{node}
 				{onExpand}
 				onConnectStart={handleConnectStart}
-				zoom={viewport.scale}
 				isDragging={draggingNode?.id === node.id}
+				selected={selectedId === node.id}
+				onSelect={(id, fromKeyboard) => {
+					selectedId = id;
+					if (fromKeyboard) graph.focusId = id;
+				}}
 			/>
 		{/each}
 	</div>
@@ -387,19 +336,22 @@
 	<!-- Recenter / fit-all buttons -->
 	{#if graph.nodes.length > 0}
 		<div class="canvas-controls">
-			<button class="ctrl-btn" onclick={centerOnSeed} title="Recenter on first seed">
+			<button class="ctrl-btn" onclick={centerOnSeed} title="Recenter on first seed" aria-label="Recenter on first seed">
 				<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
 					<circle cx="8" cy="8" r="2.5" fill="currentColor" />
 					<path d="M8 1v2.5M8 10.5V13M1 8h2.5M10.5 8H13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
 					<circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.2" />
 				</svg>
 			</button>
-			<button class="ctrl-btn" onclick={fitAll} title="Fit all nodes in view">
+			<button class="ctrl-btn" onclick={fitAll} title="Fit all nodes in view" aria-label="Fit all nodes in view">
 				<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-					<path d="M1 5V2h3M12 2h3v3M15 11v3h-3M4 14H1v-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-					<rect x="4.5" y="4.5" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1" />
+					<path d="M1 5V2h3M12 2h3v3M15 11v3h-3M4 14H1v-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="square" fill="none" />
+					<rect x="4.5" y="4.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1" />
 				</svg>
 			</button>
+			<Legend
+				class="size-6 border border-t-0 border-border bg-bg text-text hover:bg-tint active:bg-text active:text-bg"
+			/>
 		</div>
 	{/if}
 
@@ -414,7 +366,11 @@
 </div>
 
 <style>
+	/* The grid is texture, not chrome: dots at ~25% ink, quieter than the
+	   faintest edge, hard-edged (no soft falloff). */
 	.canvas-wrapper {
+		--dot: color-mix(in oklab, var(--color-text) 25%, transparent);
+		background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.5px);
 		position: fixed;
 		inset: 0;
 		overflow: hidden;
@@ -448,69 +404,94 @@
 		overflow: visible;
 	}
 
+	.edge {
+		stroke: var(--color-edge);
+	}
+	.edge-seed {
+		stroke: var(--color-edge-seed);
+	}
+	.edge-love {
+		stroke: var(--color-edge-love);
+	}
+
+	/* Chrome over the canvas: solid ground, 1px rule, no blur or shadow. */
 	.canvas-controls {
 		position: fixed;
-		bottom: 64px;
-		right: 22px;
+		/* Clears the control bar, which wraps to two rows on a phone. */
+		bottom: 7.5rem;
+		right: 1rem;
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
 		z-index: 30;
+	}
+	@media (min-width: 40rem) {
+		.canvas-controls {
+			bottom: 4.5rem;
+		}
 	}
 
 	.ctrl-btn {
-		width: 32px;
-		height: 32px;
-		border-radius: 8px;
-		background: rgba(10, 9, 20, 0.78);
-		backdrop-filter: blur(14px);
-		border: 1px solid rgba(255, 255, 255, 0.1);
-		color: rgba(203, 213, 225, 0.7);
+		width: 2.25rem;
+		height: 2.25rem;
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		color: var(--color-text);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
+	}
+	.ctrl-btn + .ctrl-btn {
+		border-top: none;
 	}
 	.ctrl-btn:hover {
-		border-color: rgba(125, 211, 252, 0.5);
-		color: rgba(125, 211, 252, 0.95);
-		background: rgba(20, 18, 38, 0.9);
+		background: var(--color-tint);
+	}
+	.ctrl-btn:active {
+		background: var(--color-text);
+		color: var(--color-bg);
 	}
 
 	.zoom-indicator {
+		display: none;
 		position: fixed;
-		bottom: 20px;
-		right: 22px;
-		display: flex;
-		gap: 8px;
+		bottom: 1.5rem;
+		right: 1rem;
+		gap: 0.5rem;
 		align-items: baseline;
-		font-size: 10px;
-		color: rgba(203, 213, 225, 0.45);
-		letter-spacing: 0.2em;
+		font-size: var(--text-2xs);
+		line-height: var(--leading-2xs);
+		color: var(--color-text-muted);
+		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		pointer-events: none;
 	}
 	.zoom-indicator .val {
 		font-feature-settings: 'tnum';
-		color: rgba(226, 232, 240, 0.7);
+		color: var(--color-text);
+	}
+	@media (min-width: 40rem) {
+		.zoom-indicator {
+			display: flex;
+		}
 	}
 
 	.connect-hint {
 		position: fixed;
-		top: 90px;
+		top: 5.25rem;
 		left: 50%;
 		transform: translateX(-50%);
-		padding: 6px 14px;
-		font-size: 11px;
-		letter-spacing: 0.15em;
+		padding: 0.375rem 0.875rem;
+		font-size: var(--text-xs);
+		line-height: var(--leading-xs);
+		letter-spacing: 0.12em;
 		text-transform: uppercase;
-		color: rgba(252, 211, 77, 0.9);
-		background: rgba(10, 9, 20, 0.8);
-		border: 1px solid rgba(252, 211, 77, 0.4);
+		white-space: nowrap;
+		color: var(--color-accent);
+		background: var(--color-bg);
+		border: 1px solid var(--color-accent);
 		border-radius: 999px;
 		pointer-events: none;
 		z-index: 40;
-		backdrop-filter: blur(14px);
 	}
 </style>

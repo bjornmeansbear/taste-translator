@@ -1,21 +1,9 @@
 <script lang="ts">
 	import { graph } from '$lib/graph.svelte';
-	import { RATINGS } from '$lib/types';
+	import { domainOf, ratingFor } from '$lib/types';
 
 	let open = $state(false);
 
-	const domainEmoji: Record<string, string> = {
-		film: '🎬',
-		tv: '📺',
-		music: '🎵',
-		book: '📖',
-		'visual-art': '🎨',
-		architecture: '🏛',
-		fashion: '👗',
-		food: '🍷',
-		game: '🎮',
-		other: '✦'
-	};
 
 	const sorted = $derived(
 		[...graph.nodes].sort((a, b) => {
@@ -29,10 +17,6 @@
 		graph.focusId = id;
 	}
 
-	function ratingEmoji(rating: string | null): string {
-		if (!rating) return '';
-		return RATINGS.find((r) => r.value === rating)?.emoji ?? '';
-	}
 </script>
 
 <!-- Toggle button -->
@@ -66,7 +50,7 @@
 					role="option"
 					aria-selected="false"
 				>
-					<span class="item-emoji">{domainEmoji[node.domain] ?? '✦'}</span>
+					<span class="item-emoji" aria-hidden="true">{domainOf(node.domain).emoji}</span>
 					<span class="item-body">
 						<span class="item-title">{node.title}</span>
 						{#if node.creator}
@@ -74,7 +58,7 @@
 						{/if}
 					</span>
 					{#if node.rating}
-						<span class="item-rating" title={node.rating}>{ratingEmoji(node.rating)}</span>
+						<span class="item-rating" title={ratingFor(node.rating)?.label}>{ratingFor(node.rating)?.emoji}</span>
 					{/if}
 					{#if isSeed}
 						<span class="seed-badge">seed</span>
@@ -88,118 +72,109 @@
 <style>
 	.list-toggle {
 		position: fixed;
-		top: 20px;
-		right: 22px;
-		width: 36px;
-		height: 36px;
-		border-radius: 10px;
-		background: rgba(10, 9, 20, 0.78);
-		backdrop-filter: blur(14px);
-		border: 1px solid rgba(255, 255, 255, 0.1);
-		color: rgba(203, 213, 225, 0.75);
+		top: 1rem;
+		right: 1rem;
+		width: 2.25rem;
+		height: 2.25rem;
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		color: var(--color-text);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
 		z-index: 35;
-		transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
 	}
-	.list-toggle:hover,
+	.list-toggle:hover {
+		background: var(--color-tint);
+	}
+	/* Open = held down: inverted. */
 	.list-toggle.is-open {
-		border-color: rgba(167, 139, 250, 0.5);
-		color: rgba(167, 139, 250, 0.95);
-		background: rgba(20, 18, 38, 0.9);
+		background: var(--color-text);
+		color: var(--color-bg);
 	}
 
+	/* Mobile: the panel spans the gutters. Tablet up: a fixed-width column. */
 	.node-list {
 		position: fixed;
-		top: 64px;
-		right: 22px;
-		width: 260px;
-		max-height: calc(100vh - 100px);
+		top: 3.75rem;
+		right: 1rem;
+		left: 1rem;
+		max-height: calc(100vh - 9rem);
 		display: flex;
 		flex-direction: column;
-		background: rgba(10, 9, 20, 0.88);
-		backdrop-filter: blur(20px);
-		border: 1px solid rgba(255, 255, 255, 0.09);
-		border-radius: 14px;
-		box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.7);
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
 		z-index: 34;
-		overflow: hidden;
+	}
+	@media (min-width: 40rem) {
+		.node-list {
+			left: auto;
+			width: 17.25rem;
+		}
 	}
 
 	.list-header {
 		display: flex;
-		align-items: center;
+		align-items: baseline;
 		justify-content: space-between;
-		padding: 12px 14px 10px;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+		padding: 0.5625rem 0.75rem;
+		border-bottom: 1px solid var(--color-border);
 		flex-shrink: 0;
 	}
 
 	.list-title {
-		font-size: 11px;
-		font-weight: 600;
+		font-size: var(--text-xs);
+		line-height: var(--leading-xs);
+		font-weight: bold;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
-		color: rgba(226, 232, 240, 0.6);
 	}
 
 	.list-count {
-		font-size: 11px;
-		color: rgba(148, 163, 184, 0.5);
+		font-size: var(--text-xs);
+		line-height: var(--leading-xs);
+		color: var(--color-text-muted);
 		font-feature-settings: 'tnum';
 	}
 
 	.list-scroll {
 		overflow-y: auto;
 		flex: 1;
-		padding: 6px;
 		scrollbar-width: thin;
-		scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
-	}
-	.list-scroll::-webkit-scrollbar {
-		width: 4px;
-	}
-	.list-scroll::-webkit-scrollbar-track {
-		background: transparent;
-	}
-	.list-scroll::-webkit-scrollbar-thumb {
-		background: rgba(255, 255, 255, 0.1);
-		border-radius: 2px;
+		scrollbar-color: var(--color-text-muted) transparent;
 	}
 
 	.list-item {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 0.5rem;
 		width: 100%;
-		padding: 7px 8px;
-		border-radius: 8px;
+		padding: 0.375rem 0.75rem;
 		background: transparent;
 		border: none;
 		cursor: pointer;
 		text-align: left;
-		transition: background 140ms ease;
-		color: inherit;
+		color: var(--color-text);
+	}
+	.list-item + .list-item {
+		border-top: 1px solid var(--color-tint);
 	}
 	.list-item:hover {
-		background: rgba(255, 255, 255, 0.05);
+		background: var(--color-tint);
 	}
-	.list-item.is-seed {
-		background: rgba(125, 211, 252, 0.05);
+	.list-item:focus-visible {
+		outline-offset: -0.25rem;
 	}
-	.list-item.is-seed:hover {
-		background: rgba(125, 211, 252, 0.1);
-	}
-	.list-item.is-exiled {
-		opacity: 0.35;
+	.list-item.is-exiled .item-title {
+		color: var(--color-text-muted);
+		text-decoration: line-through;
 	}
 
 	.item-emoji {
-		font-size: 13px;
+		font-size: var(--text-sm);
 		flex-shrink: 0;
-		width: 18px;
+		width: 1.125rem;
 		text-align: center;
 	}
 
@@ -208,24 +183,24 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 1px;
 	}
 
 	.item-title {
-		font-size: 12px;
-		color: rgba(248, 250, 252, 0.9);
+		font-family: var(--font-display);
+		font-size: var(--text-sm);
+		line-height: var(--leading-sm);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		font-family: 'Fraunces', ui-serif, Georgia, serif;
 	}
 	.list-item.is-seed .item-title {
 		font-weight: 600;
 	}
 
 	.item-creator {
-		font-size: 10px;
-		color: rgba(148, 163, 184, 0.55);
+		font-size: var(--text-2xs);
+		line-height: var(--leading-2xs);
+		color: var(--color-text-muted);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -233,19 +208,19 @@
 	}
 
 	.item-rating {
-		font-size: 12px;
+		font-size: var(--text-sm);
 		flex-shrink: 0;
 	}
 
 	.seed-badge {
-		font-size: 9px;
-		font-weight: 600;
-		letter-spacing: 0.1em;
+		font-size: var(--text-2xs);
+		line-height: var(--leading-2xs);
+		font-weight: bold;
+		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		color: rgba(125, 211, 252, 0.7);
-		border: 1px solid rgba(125, 211, 252, 0.25);
-		border-radius: 4px;
-		padding: 1px 5px;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		padding: 0 0.5rem;
 		flex-shrink: 0;
 	}
 </style>

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { graph } from '$lib/graph.svelte';
 	import { RATINGS } from '$lib/types';
-	import { listExplorations } from '$lib/storage';
 
 	type Props = {
 		onNewExploration?: () => void;
@@ -18,10 +17,8 @@
 	});
 
 	function reset() {
-		if (!confirm('Clear the whole map?')) return;
-		graph.nodes = [];
-		graph.edges = [];
-		graph.dna = {};
+		if (!confirm('Clear the whole map? Its saved copy is deleted too.')) return;
+		graph.clear();
 	}
 </script>
 
@@ -29,13 +26,14 @@
 	<div class="control-bar">
 		<!-- Exploration name -->
 		<span class="exp-name" title={graph.explorationName}>{graph.explorationName}</span>
-		<span class="sep">·</span>
+		<span class="sep" aria-hidden="true">·</span>
 
 		<div class="counts">
 			{#each RATINGS as r (r.value)}
 				{#if counts[r.value]}
 					<span class="chip" title={r.label}>
-						<span class="emoji">{r.emoji}</span>
+						<span class="emoji" aria-hidden="true">{r.emoji}</span>
+						<span class="visually-hidden">{r.label}</span>
 						<span class="n">{counts[r.value]}</span>
 					</span>
 				{/if}
@@ -44,7 +42,7 @@
 		</div>
 
 		<label class="toggle">
-			<input type="checkbox" bind:checked={graph.showExiled} />
+			<input type="checkbox" class="visually-hidden" bind:checked={graph.showExiled} />
 			<span class="track"><span class="thumb"></span></span>
 			<span class="lbl">Show Exiled</span>
 		</label>
@@ -58,45 +56,63 @@
 {/if}
 
 <style>
+	/* Mobile first: a full-width bar along the bottom edge. From tablet up it
+	   shrinks to its content at the bottom left. */
 	.control-bar {
 		position: fixed;
-		bottom: 20px;
-		left: 22px;
+		bottom: 1rem;
+		left: 1rem;
+		right: 1rem;
 		z-index: 30;
 		display: flex;
-		gap: 14px;
+		flex-wrap: wrap;
+		gap: 0.375rem 0.75rem;
 		align-items: center;
-		padding: 8px 12px;
-		border-radius: 999px;
-		background: rgba(10, 9, 20, 0.75);
-		backdrop-filter: blur(18px);
-		border: 1px solid rgba(255, 255, 255, 0.07);
-		box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
-		font-size: 12px;
-		color: rgba(226, 232, 240, 0.85);
-		max-width: calc(100vw - 200px);
+		padding: 0.375rem 0.75rem;
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		font-size: var(--text-xs);
+		line-height: var(--leading-xs);
+		color: var(--color-text);
+	}
+	@media (min-width: 40rem) {
+		.control-bar {
+			right: auto;
+			flex-wrap: nowrap;
+			max-width: calc(100vw - 12rem);
+		}
+	}
+
+	.exp-name,
+	.sep {
+		display: none;
+	}
+	@media (min-width: 40rem) {
+		.exp-name,
+		.sep {
+			display: inline;
+		}
 	}
 
 	.exp-name {
-		font-family: 'Fraunces', ui-serif, Georgia, serif;
-		font-size: 12px;
-		color: rgba(248, 250, 252, 0.75);
+		font-family: var(--font-display);
 		font-style: italic;
+		font-size: var(--text-sm);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		max-width: 180px;
+		max-width: 11.25rem;
 		flex-shrink: 1;
 	}
 
 	.sep {
-		color: rgba(148, 163, 184, 0.3);
+		color: var(--color-text-muted);
 		flex-shrink: 0;
 	}
 
 	.counts {
 		display: flex;
-		gap: 6px;
+		gap: 0.375rem;
 		align-items: center;
 		flex-shrink: 0;
 	}
@@ -104,85 +120,90 @@
 	.chip {
 		display: inline-flex;
 		align-items: center;
-		gap: 4px;
-		padding: 2px 8px;
+		gap: 0.25rem;
+		padding: 0 0.5rem;
+		border: 1px solid var(--color-border);
 		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.04);
-		font-size: 11px;
-	}
-	.chip .emoji {
-		font-size: 11px;
+		font-feature-settings: 'tnum';
 	}
 	.chip.muted {
-		color: rgba(148, 163, 184, 0.6);
+		border-color: transparent;
+		color: var(--color-text-muted);
 	}
 
+	/* Switch: a real checkbox under a pill track. On = inverted (ink track,
+	   ground thumb), like a pressed button — not an accent fill. */
 	.toggle {
+		position: relative;
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 0.5rem;
 		cursor: pointer;
 		user-select: none;
 		flex-shrink: 0;
 	}
-	.toggle input {
-		display: none;
-	}
 	.track {
-		width: 32px;
-		height: 18px;
+		width: 2rem;
+		height: 1.125rem;
+		border: 1px solid var(--color-border);
 		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.1);
+		background: var(--color-bg);
 		position: relative;
-		transition: background 200ms ease;
 	}
 	.thumb {
 		position: absolute;
 		top: 2px;
 		left: 2px;
-		width: 14px;
-		height: 14px;
-		background: rgba(226, 232, 240, 0.9);
-		border-radius: 50%;
-		transition: transform 200ms ease, background 200ms ease;
+		width: 0.75rem;
+		height: 0.75rem;
+		background: var(--color-text);
+		border-radius: 999px;
+		transition: transform 150ms ease;
 	}
 	.toggle input:checked + .track {
-		background: rgba(167, 139, 250, 0.6);
+		background: var(--color-text);
 	}
 	.toggle input:checked + .track .thumb {
-		transform: translateX(14px);
-		background: white;
+		transform: translateX(0.875rem);
+		background: var(--color-bg);
+	}
+	.toggle input:focus-visible + .track {
+		outline: 0.25rem solid var(--color-accent);
+		outline-offset: 2px;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.thumb {
+			transition: none;
+		}
 	}
 
-	.new-exp {
-		background: transparent;
-		border: 1px solid rgba(125, 211, 252, 0.25);
-		color: rgba(125, 211, 252, 0.75);
-		border-radius: 999px;
-		padding: 3px 10px;
-		font-size: 11px;
-		cursor: pointer;
-		transition: border-color 200ms ease, color 200ms ease;
-		flex-shrink: 0;
-	}
-	.new-exp:hover {
-		border-color: rgba(125, 211, 252, 0.6);
-		color: rgba(125, 211, 252, 0.95);
-	}
-
+	.new-exp,
 	.reset {
-		background: transparent;
-		border: 1px solid rgba(255, 255, 255, 0.1);
-		color: rgba(226, 232, 240, 0.7);
-		border-radius: 999px;
-		padding: 3px 10px;
-		font-size: 11px;
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		color: var(--color-text);
+		padding: 0.1875rem 0.75rem;
+		font-size: var(--text-xs);
+		line-height: var(--leading-xs);
 		cursor: pointer;
-		transition: border-color 200ms ease, color 200ms ease;
 		flex-shrink: 0;
 	}
+	.new-exp:hover,
 	.reset:hover {
-		border-color: rgba(251, 146, 146, 0.6);
-		color: rgba(251, 146, 146, 0.9);
+		background: var(--color-tint);
+	}
+	.new-exp:active,
+	.reset:active {
+		background: var(--color-text);
+		color: var(--color-bg);
+	}
+	/* Reset is destructive: it says so in the danger ink. */
+	.reset {
+		color: var(--color-danger);
+		border-color: var(--color-danger);
+	}
+	.reset:active {
+		background: var(--color-danger);
+		border-color: var(--color-danger);
 	}
 </style>

@@ -27,6 +27,24 @@ export const RATINGS: { value: Rating; emoji: string; label: string; weight: num
 	{ value: 'exile', emoji: '🚫', label: 'Hard no', weight: -3 }
 ];
 
+/** Domain marker (emoji for now — see NOTES.md, ink icons later) and short label. */
+export const DOMAINS: Record<Domain, { emoji: string; label: string }> = {
+	film: { emoji: '🎬', label: 'film' },
+	tv: { emoji: '📺', label: 'tv' },
+	music: { emoji: '🎵', label: 'music' },
+	book: { emoji: '📖', label: 'book' },
+	'visual-art': { emoji: '🎨', label: 'art' },
+	architecture: { emoji: '🏛', label: 'arch' },
+	fashion: { emoji: '👗', label: 'fashion' },
+	food: { emoji: '🍷', label: 'food' },
+	game: { emoji: '🎮', label: 'game' },
+	other: { emoji: '✦', label: 'other' }
+};
+
+export const domainOf = (d: string) => DOMAINS[d as Domain] ?? DOMAINS.other;
+
+export const ratingFor = (r: Rating | null | undefined) => (r ? RATINGS.find((x) => x.value === r) : undefined);
+
 export interface Node {
 	id: string;
 	title: string;

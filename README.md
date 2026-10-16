@@ -2,45 +2,37 @@ This program is free software: you can redistribute it and/or modify it under th
 
 ---
 
-# sv
+# Taste Translator
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A living map of your aesthetic universe. Type something you love (a film, a record, a building, a whisky) and Claude reads its "aesthetic DNA" and suggests neighbours across every medium. Rate what comes back, and the map pulls what you love in close and pushes what you don't to the edges. Each new seed finds bridges to what's already there.
 
-## Creating a project
+## Reading the map
 
-If you're seeing this, you've probably already done this step. Congrats!
+The `?` button beside the zoom controls opens the key. In short:
 
-```sh
-# create a new project
-npx sv create my-app
-```
+- **Lines:** pink if you love one end, ink from a seed you typed, gray otherwise. Dashed lines are bridges the translator found; dotted ones you drew yourself. Thicker means stronger.
+- **Cards:** a thick frame is a seed. Pink border means "really like", pink fill "part of me", dashed "not for me", dotted and struck through "hard no" (hidden unless *Show Exiled* is on).
 
-To recreate this project with the same configuration:
+Hover a card with a mouse, tap it on a touch screen, or Tab to it to rate it, translate from it (↯), or drag a link (→) to another card. Explorations save in your browser as you go.
 
-```sh
-# recreate this project
-npx sv@0.15.1 create --template minimal --types ts --install npm .
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Running it
 
 ```sh
+npm install
+cp .env.example .env   # then add your ANTHROPIC_API_KEY
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
+`npm run check` type-checks, and `npm run build` builds for Cloudflare Pages (`@sveltejs/adapter-cloudflare`). Set `ANTHROPIC_API_KEY` as a secret in the Pages project.
 
-To create a production version of your app:
+## Design
 
-```sh
-npm run build
-```
+The look comes from the Wjerk kit in `~/Code/color-system-and-guidelines`: warm cream ground, brown-black line work, pink as the one accent, structure from rules rather than shadows, and a measured dark mode. `src/lib/kit.css` is a verbatim copy of the kit's `kit.css`, so don't edit it here. Update it in the kit and copy it across. Project tokens (edge colours, the tint, the core-card fill) live in `src/app.css`, each with its measured contrast ratio.
 
-You can preview the production build with `npm run preview`.
+Type is Fraunces (OFL, self-hosted via Fontsource) for titles over the system sans. The app icon, from the kit's icon family, is in `static/` with its source SVG at `TasteTranslator.svg`.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Everything meets WCAG AA: text contrast is computed, not eyeballed, focus is always visible, and every control works by keyboard and touch.
+
+## Stack
+
+SvelteKit (Svelte 5 runes) · Tailwind CSS 4, mapped to the kit's tokens · Anthropic SDK · Cloudflare Pages.

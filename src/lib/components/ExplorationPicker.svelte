@@ -20,21 +20,16 @@
 		if (explorations.length === 0) onNew();
 	}
 
-	const domainEmoji: Record<string, string> = {
-		film: '🎬', tv: '📺', music: '🎵', book: '📖',
-		'visual-art': '🎨', architecture: '🏛', fashion: '👗',
-		food: '🍷', game: '🎮', other: '✦'
-	};
 </script>
 
 <div class="overlay" role="dialog" aria-modal="true" aria-label="Your explorations">
-	<div class="panel">
-		<div class="panel-header">
-			<div class="panel-title">
-				<span class="mark">◉</span>
+	<div class="picker">
+		<div class="picker-header">
+			<h2 class="picker-title">
+				<span class="mark" aria-hidden="true">◉</span>
 				Your Explorations
-			</div>
-			<p class="panel-sub">Pick up where you left off, or start something new.</p>
+			</h2>
+			<p class="picker-sub">Pick up where you left off, or start something new.</p>
 		</div>
 
 		<div class="explorations">
@@ -51,7 +46,7 @@
 						<div class="exp-name">{exp.name}</div>
 						<div class="exp-meta">
 							<span>{exp.nodeCount} nodes</span>
-							<span class="dot">·</span>
+							<span aria-hidden="true">·</span>
 							<span>{formatRelativeTime(exp.updatedAt)}</span>
 						</div>
 					</div>
@@ -82,80 +77,81 @@
 	.overlay {
 		position: fixed;
 		inset: 0;
-		background: rgba(5, 4, 14, 0.82);
-		backdrop-filter: blur(20px);
+		background: var(--color-overlay);
 		z-index: 200;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: 24px;
+		padding: 1rem;
 	}
 
-	.panel {
-		width: min(480px, 100%);
-		background: linear-gradient(150deg, rgba(18, 16, 32, 0.96), rgba(10, 9, 20, 0.94));
-		border: 1px solid rgba(255, 255, 255, 0.1);
-		border-radius: 20px;
-		padding: 32px;
-		box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.9);
+	.picker {
+		width: min(30rem, 100%);
+		background: var(--color-bg);
+		border: 2px solid var(--color-border);
+		padding: 1.5rem;
+	}
+	@media (min-width: 40rem) {
+		.picker {
+			padding: 2.25rem;
+		}
 	}
 
-	.panel-header {
-		margin-bottom: 24px;
+	.picker-header {
+		margin-bottom: 1.5rem;
 	}
 
-	.panel-title {
+	.picker-title {
 		display: flex;
-		align-items: center;
-		gap: 10px;
-		font-family: 'Fraunces', ui-serif, Georgia, serif;
-		font-size: 22px;
+		align-items: baseline;
+		gap: 0.625rem;
+		font-family: var(--font-display);
+		font-size: var(--text-lg);
+		line-height: var(--leading-lg);
 		font-weight: 600;
-		color: rgba(248, 250, 252, 0.97);
-		margin-bottom: 6px;
+		margin: 0 0 0.375rem;
 	}
 
 	.mark {
-		color: rgba(244, 114, 182, 0.9);
-		filter: drop-shadow(0 0 8px rgba(244, 114, 182, 0.5));
+		color: var(--color-accent);
 	}
 
-	.panel-sub {
-		font-size: 13px;
-		color: rgba(148, 163, 184, 0.65);
+	.picker-sub {
+		font-family: var(--font-display);
 		font-style: italic;
-		font-family: 'Fraunces', ui-serif, Georgia, serif;
+		font-size: var(--text-sm);
+		line-height: var(--leading-sm);
+		color: var(--color-text-muted);
 		margin: 0;
 	}
 
+	/* A ruled list: the rows share borders instead of floating as cards. */
 	.explorations {
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
-		margin-bottom: 16px;
-		max-height: 360px;
+		border-top: 1px solid var(--color-border);
+		margin-bottom: 1.5rem;
+		max-height: 22.5rem;
 		overflow-y: auto;
 		scrollbar-width: thin;
-		scrollbar-color: rgba(255,255,255,0.1) transparent;
+		scrollbar-color: var(--color-text-muted) transparent;
 	}
 
 	.exp-card {
 		display: flex;
 		align-items: center;
-		gap: 12px;
+		gap: 0.75rem;
 		width: 100%;
-		padding: 14px 16px;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid rgba(255, 255, 255, 0.07);
-		border-radius: 12px;
+		padding: 0.75rem 0.25rem 0.75rem 0.75rem;
+		border-bottom: 1px solid var(--color-border);
 		cursor: pointer;
 		text-align: left;
-		transition: background 160ms ease, border-color 160ms ease;
-		color: inherit;
 	}
 	.exp-card:hover {
-		background: rgba(167, 139, 250, 0.08);
-		border-color: rgba(167, 139, 250, 0.3);
+		background: var(--color-tint);
+	}
+	.exp-card:focus-visible {
+		outline-offset: -0.25rem;
 	}
 
 	.exp-body {
@@ -164,64 +160,63 @@
 	}
 
 	.exp-name {
-		font-size: 15px;
-		font-family: 'Fraunces', ui-serif, Georgia, serif;
-		color: rgba(248, 250, 252, 0.95);
+		font-family: var(--font-display);
+		font-size: var(--text-base);
+		line-height: var(--leading-base);
 		font-weight: 500;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		margin-bottom: 4px;
 	}
 
 	.exp-meta {
-		font-size: 11px;
-		color: rgba(148, 163, 184, 0.55);
+		font-size: var(--text-xs);
+		line-height: var(--leading-xs);
+		color: var(--color-text-muted);
 		display: flex;
 		align-items: center;
-		gap: 6px;
+		gap: 0.375rem;
 	}
-	.dot { opacity: 0.5; }
 
+	/* 44px touch target, drawn small. */
 	.del-btn {
 		flex-shrink: 0;
-		width: 24px;
-		height: 24px;
-		border-radius: 6px;
+		width: 2.75rem;
+		height: 2.75rem;
 		border: 1px solid transparent;
 		background: transparent;
-		color: rgba(148, 163, 184, 0.4);
+		color: var(--color-text-muted);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 	}
 	.del-btn:hover {
-		background: rgba(251, 146, 146, 0.12);
-		border-color: rgba(251, 146, 146, 0.3);
-		color: rgba(251, 146, 146, 0.9);
+		color: var(--color-danger);
+		border-color: var(--color-danger);
+	}
+	.del-btn:active {
+		background: var(--color-danger);
+		color: var(--color-bg);
 	}
 
 	.new-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 8px;
+		gap: 0.5rem;
 		width: 100%;
-		padding: 12px;
-		background: transparent;
-		border: 1px dashed rgba(255, 255, 255, 0.15);
-		border-radius: 12px;
-		color: rgba(148, 163, 184, 0.65);
-		font-size: 13px;
+		padding: 0.6875rem;
+		background: var(--color-accent);
+		border: 1px solid var(--color-accent);
+		color: var(--color-bg);
+		font-size: var(--text-base);
+		line-height: var(--leading-base);
+		font-weight: bold;
 		cursor: pointer;
-		transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
-		letter-spacing: 0.03em;
 	}
-	.new-btn:hover {
-		border-color: rgba(125, 211, 252, 0.4);
-		color: rgba(125, 211, 252, 0.9);
-		background: rgba(125, 211, 252, 0.05);
+	.new-btn:active {
+		background: var(--color-accent-hover);
+		border-color: var(--color-accent-hover);
 	}
 </style>
