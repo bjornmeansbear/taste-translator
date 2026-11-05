@@ -15,6 +15,8 @@ The `?` button beside the zoom controls opens the key. In short:
 
 Hover a card with a mouse, tap it on a touch screen, or Tab to it to rate it, translate from it (↯), or drag a link (→) to another card. Explorations save in your browser as you go.
 
+There is a key to help guide you in the active app.
+
 ## Running it
 
 ```sh
