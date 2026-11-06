@@ -136,6 +136,28 @@
 				>
 				<span>{emoji('exile')} Dotted, struck through: hard no. Hidden unless “Show Exiled” is on.</span>
 			</li>
+			<li class="flex items-center gap-3">
+				<span
+					class="grid size-4 shrink-0 place-items-center rounded-full border border-accent bg-bg text-2xs text-accent"
+					aria-hidden="true">★</span
+				>
+				<span>Pink star: kept. Your kept finds are in the list (top right), ready to copy or download.</span>
+			</li>
 		</ul>
+
+		<p class="mt-4 mb-0 border-t border-border pt-2 text-xs text-text-muted">
+			Wjunderkammer is free and open source (AGPL-3.0).
+			<a
+				class="text-text underline underline-offset-4"
+				href="https://github.com/bjornmeansbear/taste-translator"
+				target="_blank"
+				rel="noopener noreferrer">Source code on GitHub</a
+			>. Part of the <a
+				class="text-text underline underline-offset-4"
+				href="https://a.wjerk.shop"
+				target="_blank"
+				rel="noopener noreferrer">Wjerk</a
+			> family.
+		</p>
 	</div>
 </dialog>

@@ -19,9 +19,23 @@ The `?` button beside the zoom controls opens the key. In short:
 - **Lines:** pink if you love one end, ink from a seed you typed, gray otherwise. Dashed lines are bridges the translator found; dotted ones you drew yourself. Thicker means stronger.
 - **Cards:** a thick frame is a seed. Pink border means "really like", pink fill "part of me", dashed "not for me", dotted and struck through "hard no" (hidden unless *Show Exiled* is on).
 
-Hover a card with a mouse, tap it on a touch screen, or Tab to it to rate it, translate from it (↯), or drag a link (→) to another card. Explorations save in your browser as you go.
+Hover a card with a mouse, tap it on a touch screen, or Tab to it to rate it, translate from it (↯), keep it (☆), or drag a link (→) to another card. Explorations save in your browser as you go.
 
 There is a key to help guide you in the active app.
+
+## Keeping what you find
+
+Wjunderkammer is a fun collector of new things, not a place to store them. Tap ☆ on any card to keep it. Kept finds get a pink star and gather in the **Kept** tab of the list (top right), across all your maps. From there, *Copy as text* or *Download Markdown* takes the list wherever you actually keep things: notes, a reading list, a shopping list.
+
+Each card also links somewhere useful: Bookshop.org for books, Bandcamp and Discogs for music, JustWatch and Letterboxd for film, Steam for games, Maps for buildings and food, and Wikipedia for everything.
+
+Nothing leaves your browser. There are no accounts, and both maps and kept finds live in `localStorage`, so clearing your browser data clears them.
+
+## An experiment
+
+This is an experiment in fiddling with the new LLM tools, and there are probably plenty of other, better ways to build it. As set up here, it talks to the Claude API: Claude Haiku 5.5, with thinking on, reads each seed and suggests what comes next. In side-by-side tests it matched Claude Sonnet's picks at about a tenth of the cost, around a tenth of a cent per search. Each call logs its tokens and approximate cost in the dev server's terminal.
+
+All the model calls are in `src/lib/server/anthropic.ts`, so swapping in another model or provider means changing that one file. A small local model through Ollama (Qwen 3.5 9B) was also tried: it ran, but it invented works and lost the interpretive leaps that make the recommendations interesting.
 
 ## Running it
 
@@ -32,6 +46,10 @@ npm run dev
 ```
 
 `npm run check` type-checks, and `npm run build` builds for Cloudflare Pages (`@sveltejs/adapter-cloudflare`). Set `ANTHROPIC_API_KEY` as a secret in the Pages project.
+
+Optional: set `PUBLIC_BOOKSHOP_AFFILIATE_ID` to your [Bookshop.org affiliate](https://bookshop.org/affiliate_profile/introduction) ID. Book links that found an ISBN then go through your affiliate link, and the Kept tab shows a short commission disclosure. Without it, they're plain links. If you fork this, use your own ID or leave it unset.
+
+The source is on [GitHub](https://github.com/bjornmeansbear/taste-translator). The app links to it from the key, as the AGPL asks of anything run as a website.
 
 ## Design
 
@@ -44,3 +62,7 @@ Everything meets WCAG AA: text contrast is computed, not eyeballed, focus is alw
 ## Stack
 
 SvelteKit (Svelte 5 runes) · Tailwind CSS 4, mapped to the kit's tokens · Anthropic SDK · Cloudflare Pages.
+
+## Ideas
+
+- **Are.na:** send kept finds to [Are.na](https://www.are.na), either all at once as a new channel or one by one into channels you're already working in. Are.na has a public API, so this would need an Are.na login (OAuth) but no account here.

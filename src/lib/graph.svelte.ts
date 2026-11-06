@@ -1,4 +1,4 @@
-import type { Node, Edge, Rating, Recommendation } from './types';
+import type { Node, Edge, Rating, Recommendation, RecommendationExtras } from './types';
 import { ratingFor } from './types';
 import { saveExploration, loadExploration, deleteExploration } from './storage';
 import type { ExplorationSave } from './storage';
@@ -85,7 +85,7 @@ class Graph {
 
 	ingestRecommendations(
 		parentId: string,
-		recs: (Recommendation & { imageUrl?: string | null })[]
+		recs: (Recommendation & RecommendationExtras)[]
 	) {
 		const parent = this.nodes.find((n) => n.id === parentId);
 		if (!parent) return [];
@@ -109,6 +109,8 @@ class Graph {
 				year: r.year ?? null,
 				reason: r.reason,
 				imageUrl: r.imageUrl ?? null,
+				wikiTitle: r.wikiTitle ?? null,
+				isbn: r.isbn ?? null,
 				rating: null,
 				x,
 				y,

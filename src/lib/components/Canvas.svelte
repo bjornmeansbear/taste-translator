@@ -37,7 +37,7 @@
 
 	// Presses on these belong to their own controls, not to the canvas: capturing
 	// the pointer here would swallow their clicks.
-	const NOT_CANVAS = '.link-handle, .actions, .rating-menu, .canvas-controls, dialog';
+	const NOT_CANVAS = '.link-handle, .actions, .rating-menu, .find-links, .canvas-controls, dialog';
 
 	function clientToWorld(cx: number, cy: number) {
 		const rect = wrapper.getBoundingClientRect();

@@ -61,6 +61,10 @@ export interface Node {
 	depth: number;
 	createdAt: number;
 	imageUrl?: string | null;
+	/** The Wikipedia page the thumbnail lookup matched, for a direct link. */
+	wikiTitle?: string | null;
+	/** English-language ISBN-13 for books, for a direct Bookshop.org link. */
+	isbn?: string | null;
 	expanding?: boolean;
 	seed?: boolean;
 }
@@ -80,6 +84,13 @@ export interface Recommendation {
 	domain: Domain;
 	year?: number | null;
 	reason: string;
+}
+
+/** What the server adds to each recommendation after the model answers. */
+export interface RecommendationExtras {
+	imageUrl?: string | null;
+	wikiTitle?: string | null;
+	isbn?: string | null;
 }
 
 export interface Bridge {

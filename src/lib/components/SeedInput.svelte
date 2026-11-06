@@ -72,7 +72,7 @@
 			<div class="hint">
 				<p class="hint-lead">Whatever you enter, we'll find things you might also like across:</p>
 				<p class="hint-list">
-					Architecture · Art · Books · Fashion · Film · Food · Games · Music · TV
+					Architecture&nbsp;· Art&nbsp;· Books&nbsp;· Fashion&nbsp;· Film&nbsp;· Food&nbsp;· Games&nbsp;· Music&nbsp;· TV
 				</p>
 			</div>
 		{/if}

@@ -7,7 +7,7 @@
 	import ExplorationPicker from '$lib/components/ExplorationPicker.svelte';
 	import { graph } from '$lib/graph.svelte';
 	import { listExplorations } from '$lib/storage';
-	import type { Domain, Recommendation, Bridge } from '$lib/types';
+	import type { Domain, Recommendation, RecommendationExtras, Bridge } from '$lib/types';
 
 	let loading = $state(false);
 	let error = $state<string | null>(null);
@@ -45,8 +45,10 @@
 		seedDomain?: Domain | null;
 		seedCreator?: string;
 		seedImageUrl?: string | null;
+		seedWikiTitle?: string | null;
+		seedIsbn?: string | null;
 		dna: string;
-		recommendations: (Recommendation & { imageUrl?: string | null })[];
+		recommendations: (Recommendation & RecommendationExtras)[];
 		bridges?: Bridge[];
 	};
 
@@ -125,6 +127,8 @@
 			year: null,
 			reason: data.dna,
 			imageUrl: data.seedImageUrl ?? null,
+			wikiTitle: data.seedWikiTitle ?? null,
+			isbn: data.seedIsbn ?? null,
 			rating: isFirstSeed ? 'love' : null,
 			x: pos.x,
 			y: pos.y,

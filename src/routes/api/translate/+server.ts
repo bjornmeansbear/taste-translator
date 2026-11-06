@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { RequestHandler } from './$types';
 import { translateTaste, classifySeed } from '$lib/server/anthropic';
 import { fetchThumb, fetchThumbs } from '$lib/server/thumbnails';
+import { fetchIsbn } from '$lib/server/isbn';
 import type { Domain } from '$lib/types';
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -56,22 +57,36 @@ export const POST: RequestHandler = async ({ request }) => {
 				: Promise.resolve(null)
 		]);
 
-		const recThumbs = await fetchThumbs(
-			result.recommendations.map((r) => ({
-				title: r.title,
-				creator: r.creator,
-				domain: r.domain
-			}))
-		);
+		// Images, Wikipedia pages and (for books) ISBNs, all looked up at once.
+		const isBook = (d?: string | null) => d === 'book';
+		const [recWiki, recIsbns, seedIsbn] = await Promise.all([
+			fetchThumbs(
+				result.recommendations.map((r) => ({
+					title: r.title,
+					creator: r.creator,
+					domain: r.domain
+				}))
+			),
+			Promise.all(
+				result.recommendations.map((r) =>
+					isBook(r.domain) ? fetchIsbn(r.title, r.creator) : Promise.resolve(null)
+				)
+			),
+			body.fetchSeedThumb && isBook(seedDomain) ? fetchIsbn(seedTitle, seedCreator) : Promise.resolve(null)
+		]);
 
 		return json({
 			seedDomain,
 			seedCreator,
-			seedImageUrl: seedThumb,
+			seedImageUrl: seedThumb?.imageUrl ?? null,
+			seedWikiTitle: seedThumb?.wikiTitle ?? null,
+			seedIsbn,
 			dna: result.dna,
 			recommendations: result.recommendations.map((r, i) => ({
 				...r,
-				imageUrl: recThumbs[i]
+				imageUrl: recWiki[i].imageUrl,
+				wikiTitle: recWiki[i].wikiTitle,
+				isbn: recIsbns[i]
 			})),
 			bridges: result.bridges
 		});

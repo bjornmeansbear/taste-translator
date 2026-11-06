@@ -2,6 +2,8 @@
 	import type { Node, Rating } from '$lib/types';
 	import { RATINGS, domainOf, ratingFor } from '$lib/types';
 	import { graph } from '$lib/graph.svelte';
+	import { collection } from '$lib/collection.svelte';
+	import { findLinks } from '$lib/links';
 
 	type Props = {
 		node: Node;
@@ -45,6 +47,7 @@
 
 	const ratingInfo = $derived(ratingFor(node.rating));
 	const domain = $derived(domainOf(node.domain));
+	const kept = $derived(collection.has(node));
 
 
 
@@ -137,7 +140,20 @@
 		{#if node.reason && active}
 			<div class="reason">{node.reason}</div>
 		{/if}
+		{#if active}
+			<div class="find-links">
+				{#each findLinks(node) as link (link.url)}
+					<a href={link.url} target="_blank" rel="noopener noreferrer{link.affiliate ? ' sponsored' : ''}"
+						>{link.label}</a
+					>
+				{/each}
+			</div>
+		{/if}
 	</div>
+
+	{#if kept}
+		<div class="kept-badge" title="Kept">★<span class="visually-hidden">Kept</span></div>
+	{/if}
 
 	{#if active}
 		<button
@@ -191,6 +207,19 @@
 				aria-label="Translate from here"
 			>
 				↯
+			</button>
+			<button
+				class="act-btn keep-btn"
+				class:is-kept={kept}
+				onclick={(e) => {
+					e.stopPropagation();
+					collection.toggle(node);
+				}}
+				title={kept ? 'Kept: tap to unkeep' : 'Keep this find'}
+				aria-label={kept ? `Unkeep ${node.title}` : `Keep ${node.title}`}
+				aria-pressed={kept}
+			>
+				{kept ? '★' : '☆'}
 			</button>
 		</div>
 	{/if}
@@ -380,6 +409,51 @@
 		border-top: 1px solid var(--color-border);
 		font-size: var(--text-xs);
 		line-height: var(--leading-xs);
+	}
+
+	/* Where to go next: small underlined links under the reason. */
+	.find-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0 0.75rem;
+		margin-top: 0.5rem;
+		font-size: var(--text-2xs);
+		line-height: var(--leading-2xs);
+	}
+	.reason + .find-links {
+		margin-top: 0.375rem;
+	}
+	.find-links a {
+		color: var(--color-text);
+		text-decoration: underline;
+		text-underline-offset: 0.2em;
+		/* Taller hit area without changing the line. */
+		padding: 0.25rem 0;
+	}
+	.find-links a:hover {
+		color: var(--color-accent);
+	}
+
+	/* Kept: a pink star at the top-left corner, mirroring the rating badge. */
+	.kept-badge {
+		position: absolute;
+		top: -0.625rem;
+		left: -0.625rem;
+		width: 1.5rem;
+		height: 1.5rem;
+		border-radius: 999px;
+		background: var(--color-bg);
+		border: 1px solid var(--color-accent);
+		color: var(--color-accent);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: var(--text-2xs);
+		z-index: 3;
+	}
+
+	.keep-btn.is-kept {
+		color: var(--color-accent);
 	}
 
 	/* Small round controls hanging off the card are badge-scale, so they may
