@@ -36,7 +36,7 @@ const DOMAINS: Domain[] = [
 	'other'
 ];
 
-const SYSTEM_PROMPT = `You are the engine behind Taste Translator — a tool that maps a person's aesthetic DNA across creative domains.
+const SYSTEM_PROMPT = `You are the engine behind Wjunderkammer — a tool that maps a person's aesthetic DNA across creative domains.
 
 Your job: given a seed item (and optionally the wider constellation of what the user loves and hates), read its aesthetic DNA — mood, texture, color, pacing, emotional register, cultural moment, values it embodies — and surface 5 to 8 recommendations that cross at least 3 different creative domains (film, tv, music, book, visual-art, architecture, fashion, food, game, other).
 

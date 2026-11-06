@@ -159,7 +159,7 @@
 <svelte:window onpagehide={() => graph.save()} />
 
 <svelte:head>
-	<title>Taste Translator</title>
+	<title>Wjunderkammer</title>
 </svelte:head>
 
 {#if showPicker}

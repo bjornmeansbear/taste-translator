@@ -34,7 +34,7 @@ async function wikiSearch(query: string): Promise<string | null> {
 	)}&srlimit=1&format=json&origin=*`;
 	try {
 		const res = await fetch(url, {
-			headers: { 'User-Agent': 'TasteTranslator/1.0 (local)' }
+			headers: { 'User-Agent': 'Wjunderkammer/1.0 (local)' }
 		});
 		if (!res.ok) return null;
 		const data = (await res.json()) as {
@@ -50,7 +50,7 @@ async function wikiThumb(pageTitle: string): Promise<string | null> {
 	const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pageTitle)}`;
 	try {
 		const res = await fetch(url, {
-			headers: { 'User-Agent': 'TasteTranslator/1.0 (local)' }
+			headers: { 'User-Agent': 'Wjunderkammer/1.0 (local)' }
 		});
 		if (!res.ok) return null;
 		const data = (await res.json()) as {

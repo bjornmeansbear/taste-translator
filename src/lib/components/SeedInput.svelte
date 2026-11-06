@@ -43,7 +43,7 @@
 	<div class="seed-card">
 		{#if centered}
 			<div class="brand">
-				<h1 class="title">Taste Translator</h1>
+				<h1 class="title">Wjunderkammer</h1>
 			</div>
 			<p class="tagline">Map your aesthetic universe.</p>
 		{/if}

@@ -2,9 +2,15 @@ This program is free software: you can redistribute it and/or modify it under th
 
 ---
 
-# Taste Translator
+# Wjunderkammer
 
-A living map of your aesthetic universe. Type something you love (a film, a record, a building, a whisky) and Claude reads its "aesthetic DNA" and suggests neighbours across every medium. Rate what comes back, and the map pulls what you love in close and pushes what you don't to the edges. Each new seed finds bridges to what's already there.
+Map your aesthetic universe.
+
+A *Wunderkammer* was a cabinet of curiosities: shells, carvings, maps and instruments, gathered by one collector and arranged so the objects spoke to each other. Wjunderkammer is a cabinet for your taste. Type something you love (a film, a record, a building, a whisky) and Claude reads its "aesthetic DNA" and suggests neighbours across every medium. Rate what comes back, and the map pulls what you love in close and pushes what you don't to the edges. Each new seed finds bridges to what's already there, and slowly the cabinet becomes a network of interconnected cultural objects.
+
+Underneath it is the idea of *terroir*: the soil, climate and history that give a wine its character. Taste doesn't come from nowhere either. It grows out of a particular intellectual and cultural ground, and the map is a way of seeing that ground.
+
+Part of the [Wjerk](https://a.wjerk.shop) family of projects. The repo is still called `taste-translator`, its working title: take what you like and translate it into other things you might like.
 
 ## Reading the map
 
