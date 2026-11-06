@@ -11,9 +11,10 @@ function getClient() {
 	return new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 3 });
 }
 
-// Sonnet for the translation itself: it carries the taste, where Opus cost far
-// more per click for little visible gain. Haiku for the one-line lookup.
-const TRANSLATE_MODEL = 'claude-sonnet-5-5';
+// Haiku with thinking on for the translation: in side-by-side tests it matched
+// Sonnet's picks at about a tenth of the cost (~0.1¢ a search). Thinking off
+// was cheaper but noticeably weaker. Haiku also does the one-line lookup.
+const TRANSLATE_MODEL = 'claude-haiku-5-5';
 const CLASSIFY_MODEL = 'claude-haiku-5-5';
 
 // How much of the map goes into each request. The map grows with every click;
@@ -115,6 +116,31 @@ export interface TranslateResult {
 
 const recent = (list: string[], n: number) => list.slice(-n);
 
+// Dollars per million tokens [input, output], from Anthropic's price list (Oct 2026).
+// Update these if prices change.
+const PRICES: Record<string, [number, number]> = {
+	'claude-sonnet-5-5': [2, 10],
+	'claude-sonnet-5': [2, 10], // the refusal fallback
+	'claude-haiku-5-5': [0.1, 0.5]
+};
+
+/** One terminal line per call, so the cost of a search is visible while you use it. */
+function logUsage(
+	label: string,
+	model: string,
+	usage: { input_tokens: number; output_tokens: number },
+	startedAt: number
+) {
+	const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+	const price = PRICES[model];
+	const cost = price
+		? `$${((usage.input_tokens * price[0] + usage.output_tokens * price[1]) / 1e6).toFixed(4)}`
+		: 'cost unknown';
+	console.log(
+		`[usage] ${label} · ${model} · ${usage.input_tokens} in / ${usage.output_tokens} out · ${cost} · ${seconds}s`
+	);
+}
+
 export async function translateTaste(input: TranslateInput): Promise<TranslateResult> {
 	const loves = recent(input.loves, MAX_LOVES);
 	const dislikes = recent(input.dislikes, MAX_DISLIKES);
@@ -134,21 +160,21 @@ export async function translateTaste(input: TranslateInput): Promise<TranslateRe
 		.filter(Boolean)
 		.join('\n');
 
-	// Thinking off (between_tools is Sonnet 5.5's "off"): the old Opus call ran
-	// without it, and thinking is billed as output. Structured outputs replace
-	// the forced tool call, which Sonnet 5.5 doesn't accept. The fallback only
-	// re-runs "cyber"/"frontier_llm" refusals on Sonnet 5; it costs nothing
-	// unless one happens.
-	const response = await getClient().beta.messages.create({
+	// Thinking on: it's what makes Haiku's picks interpretive rather than
+	// literal. It's billed as output, so max_tokens leaves room for it.
+	// Structured outputs keep the JSON shape. Haiku has no server-side
+	// fallback; a refusal is caught below.
+	const startedAt = Date.now();
+	const response = await getClient().messages.create({
 		model: TRANSLATE_MODEL,
-		max_tokens: 4000,
-		thinking: { type: 'between_tools' },
-		output_config: { effort: 'medium', format: { type: 'json_schema', schema: RECOMMEND_SCHEMA } },
-		betas: ['server-side-fallback-2026-07-01'],
-		fallbacks: 'default',
+		max_tokens: 16000,
+		thinking: { type: 'adaptive' },
+		// High so it reliably thinks; at medium it sometimes barely did and the picks went flat.
+		output_config: { effort: 'high', format: { type: 'json_schema', schema: RECOMMEND_SCHEMA } },
 		system: SYSTEM_PROMPT,
 		messages: [{ role: 'user', content: userContent }]
 	});
+	logUsage('translate', response.model, response.usage, startedAt);
 
 	if (response.stop_reason === 'refusal') {
 		throw new Error('The translator passed on this one. Try a different seed.');
@@ -189,6 +215,7 @@ export async function classifySeed(
 	text: string
 ): Promise<{ title: string; creator?: string; domain: Domain; year?: number | null }> {
 	const fallback = { title: text, domain: 'other' as Domain };
+	const startedAt = Date.now();
 	const response = await getClient().messages.create({
 		model: CLASSIFY_MODEL,
 		max_tokens: 1000,
@@ -198,6 +225,7 @@ export async function classifySeed(
 		system: 'You classify a freeform taste seed (a film, record, book, place, dish…) into structured metadata.',
 		messages: [{ role: 'user', content: `Classify: "${text}"` }]
 	});
+	logUsage('classify', response.model, response.usage, startedAt);
 
 	const block = response.content.find((b) => b.type === 'text');
 	if (response.stop_reason === 'refusal' || !block || block.type !== 'text') return fallback;

@@ -43,10 +43,9 @@
 	<div class="seed-card">
 		{#if centered}
 			<div class="brand">
-				<div class="mark" aria-hidden="true">◉</div>
 				<h1 class="title">Taste Translator</h1>
 			</div>
-			<p class="tagline">A living map of your aesthetic universe.</p>
+			<p class="tagline">Map your aesthetic universe.</p>
 		{/if}
 		<div class="input-row">
 			<input
@@ -71,7 +70,10 @@
 		{/if}
 		{#if centered}
 			<div class="hint">
-				Film · Book · Album · Band · Painting · Architect · TV · Fashion · Food
+				<p class="hint-lead">Whatever you enter, we'll find things you might also like across:</p>
+				<p class="hint-list">
+					Architecture · Art · Books · Fashion · Film · Food · Games · Music · TV
+				</p>
 			</div>
 		{/if}
 	</div>
@@ -124,12 +126,8 @@
 	.brand {
 		display: flex;
 		align-items: baseline;
+		justify-content: center;
 		gap: 0.75rem;
-	}
-	.mark {
-		font-size: var(--text-lg);
-		line-height: var(--leading-lg);
-		color: var(--color-accent);
 	}
 	.title {
 		font-family: var(--font-display);
@@ -145,6 +143,7 @@
 		font-size: var(--text-base);
 		line-height: var(--leading-base);
 		color: var(--color-text-muted);
+		text-align: center;
 		margin: 0 0 1.5rem;
 	}
 
@@ -227,11 +226,17 @@
 
 	.hint {
 		margin-top: 1.125rem;
+		color: var(--color-text-muted);
+		text-align: center;
+	}
+	.hint p {
+		margin: 0;
 		font-size: var(--text-2xs);
 		line-height: var(--leading-2xs);
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
-		color: var(--color-text-muted);
-		text-align: center;
+	}
+	.hint-list {
+		margin-top: 0.375rem;
 	}
 </style>

@@ -26,7 +26,6 @@
 	<div class="picker">
 		<div class="picker-header">
 			<h2 class="picker-title">
-				<span class="mark" aria-hidden="true">◉</span>
 				Your Explorations
 			</h2>
 			<p class="picker-sub">Pick up where you left off, or start something new.</p>
@@ -99,21 +98,15 @@
 
 	.picker-header {
 		margin-bottom: 1.5rem;
+		text-align: center;
 	}
 
 	.picker-title {
-		display: flex;
-		align-items: baseline;
-		gap: 0.625rem;
 		font-family: var(--font-display);
 		font-size: var(--text-lg);
 		line-height: var(--leading-lg);
 		font-weight: 600;
 		margin: 0 0 0.375rem;
-	}
-
-	.mark {
-		color: var(--color-accent);
 	}
 
 	.picker-sub {
